@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Bus Transport</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; color: #1a202c; }
+
+     .admin-shell { max-width: 1400px; margin: 100px auto 40px; padding: 0 20px 40px; }
+     
+     /* Header Section */
+     .admin-top { 
+       display:flex; 
+       align-items:center; 
+       justify-content:space-between; 
+       margin-bottom: 24px; 
+       background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+       padding: 20px 24px;
+       border-radius: 12px;
+       color: white;
+       box-shadow: 0 4px 20px rgba(30, 64, 175, 0.3);
+     }
+    .admin-title { font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .admin-title::before { content: '🚌'; font-size: 1.5rem; }
+    .logout { 
+      background: rgba(255,255,255,0.2); 
+      border: 1px solid rgba(255,255,255,0.3); 
+      padding: 10px 18px; 
+      border-radius: 8px; 
+      cursor:pointer; 
+      color: white;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .logout:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
+
+         /* Navigation Tabs */
+     .admin-nav { display:flex; gap:8px; margin-bottom: 20px; background: white; padding: 8px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+     .admin-tab { 
+       padding:12px 24px; 
+       border: none;
+       background: transparent;
+       color: #64748b;
+       border-radius:8px; 
+       cursor:pointer;
+       font-weight: 600;
+       transition: all 0.3s ease;
+       position: relative;
+     }
+     .admin-tab.active { 
+       background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+       color: #fff;
+       box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+     }
+     .admin-tab:not(.active):hover {
+       background: #f0f4f8;
+       color: #1a202c;
+     }
+
+    /* Card Styles */
+    .card { 
+      background: #ffffff; 
+      border: 1px solid #e7eef5; 
+      border-radius: 16px; 
+      padding: 24px; 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: all 0.3s ease;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+         .section-title { 
+       font-weight: 700; 
+       font-size: 1.3rem;
+       margin-bottom: 16px; 
+       color: #1e40af;
+       display: flex;
+       align-items: center;
+       gap: 8px;
+     }
+
+    /* Dashboard Table */
+    table.admin-table { 
+      width:100%; 
+      border-collapse: collapse; 
+      margin-top: 8px;
+    }
+    .admin-table th, .admin-table td { 
+      padding:14px 16px; 
+      border-bottom: 1px solid #e7eef5; 
+      text-align:left; 
+    }
+         .admin-table th { 
+       background: linear-gradient(to right, #eff6ff, #dbeafe);
+       font-weight: 700;
+       color: #1e40af;
+       font-size: 0.9rem;
+       text-transform: uppercase;
+       letter-spacing: 0.5px;
+     }
+     .admin-table tr:hover { background: #f0f4f8; }
+     .badge { 
+       padding: 6px 12px; 
+       border-radius: 20px; 
+       font-size: 0.85rem; 
+       font-weight: 600;
+       display: inline-block;
+     }
+     .badge-ok { background: #dbeafe; color: #1e40af; }
+     .badge-no { background: #fecaca; color: #991b1b; }
+
+    /* Form Styles */
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .grid-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; }
+         .form-input { 
+       width:100%; 
+       padding:12px 16px; 
+       border: 2px solid #cbd5e1; 
+       border-radius: 10px; 
+       font-size: 0.95rem;
+       transition: all 0.3s ease;
+     }
+     .form-input:focus {
+       outline: none;
+       border-color: #3b82f6;
+       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+     }
+     .form-group { display: flex; flex-direction: column; gap: 8px; }
+     .form-group label { font-weight: 600; color: #1e40af; font-size: 0.9rem; }
+    .btn { 
+      padding:12px 20px; 
+      border-radius: 10px; 
+      border: none;
+      font-weight: 600;
+      cursor:pointer; 
+      transition: all 0.3s ease;
+      font-size: 0.95rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+         .btn.primary { 
+       background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+       color: #fff;
+       box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+     }
+     .btn.primary:hover { 
+       transform: translateY(-2px);
+       box-shadow: 0 6px 16px rgba(30, 64, 175, 0.5);
+     }
+     .btn.danger { 
+       background: #dc2626; 
+       color: #fff;
+       box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+     }
+     .btn.danger:hover { 
+       background: #991b1b;
+       transform: translateY(-2px);
+     }
+     .btn:not(.primary):not(.danger) {
+       background: #f0f4f8;
+       color: #1e40af;
+       border: 2px solid #cbd5e1;
+     }
+     .btn:not(.primary):not(.danger):hover {
+       background: #dbeafe;
+       border-color: #93c5fd;
+     }
+    .small { font-size:0.9rem; color:#64748b; }
+    .loading { text-align:center; padding:40px; color:#94a3b8; font-size: 1.1rem; }
+        /* Notifications: fixed overlay so they appear above everything and don't push layout */
+        .notification {
+          position: fixed;
+          top: 18px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 99999;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 18px;
+          border-radius: 10px;
+          box-shadow: 0 8px 30px rgba(2,6,23,0.2);
+          max-width: calc(100% - 40px);
+          width: auto;
+          pointer-events: auto;
+          font-weight: 600;
+        }
+        .notification.error {
+          color: #991b1b;
+          background: #fff5f5;
+          border-left: 4px solid #dc2626;
+        }
+        .notification.error::before { content: '⚠️'; font-size: 1.2rem; }
+        .notification.success {
+          color: #0f172a;
+          background: #eff6ff;
+          border-left: 4px solid #3b82f6;
+        }
+        .notification.success::before { content: '✓'; font-weight: bold; }
+    .list { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+    .item { 
+      display:flex; 
+      align-items:center; 
+      justify-content:space-between; 
+      padding:16px 18px; 
+      border: 2px solid #e7eef5; 
+      border-radius: 12px;
+      background: white;
+      transition: all 0.3s ease;
+    }
+    .item:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+    /* Modal Styles */
+         .item.dragging {
+       opacity: 0.5;
+       background: #dbeafe;
+       transform: scale(0.95);
+     }
+     .item.drag-over {
+       border-top: 3px solid #3b82f6;
+       border-color: #3b82f6;
+     }
+
+    .modal { 
+      display: none; 
+      position: fixed; 
+      z-index: 1000; 
+      left: 0; 
+      top: 0; 
+      width: 100%; 
+      height: 100%; 
+      overflow: auto; 
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+    }
+    .modal-content { 
+      background-color: #ffffff; 
+      margin: 3% auto; 
+      padding: 0; 
+      border: none;
+      width: 90%; 
+      max-width: 1000px; 
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+    @keyframes modalSlideIn {
+      from { opacity: 0; transform: translateY(-30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+         .modal-header { 
+       display: flex; 
+       justify-content: space-between; 
+       align-items: center; 
+       padding: 24px 28px; 
+       background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+       border-radius: 20px 20px 0 0;
+     }
+    .modal-header h2 { 
+      margin: 0; 
+      font-size: 1.6rem; 
+      color: white;
+      font-weight: 700;
+    }
+    .modal-close { 
+      color: white; 
+      font-size: 32px; 
+      font-weight: bold; 
+      cursor: pointer;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+    .modal-close:hover { 
+      background: rgba(255, 255, 255, 0.3);
+      transform: rotate(90deg);
+    }
+    .modal-body { 
+      padding: 28px; 
+      max-height: calc(90vh - 100px);
+      overflow-y: auto;
+    }
+    
+    /* Route Editor Tabs */
+         .route-editor-tabs { 
+       display: flex; 
+       gap: 12px; 
+       margin-bottom: 24px; 
+       border-bottom: 2px solid #cbd5e1;
+       padding-bottom: 0;
+     }
+     .route-editor-tab { 
+       padding: 14px 24px; 
+       border: none;
+       background: transparent;
+       cursor: pointer; 
+       border-bottom: 3px solid transparent;
+       font-weight: 600;
+       color: #64748b;
+       transition: all 0.3s ease;
+       margin-bottom: -2px;
+     }
+     .route-editor-tab.active { 
+       color: #3b82f6;
+       border-bottom-color: #3b82f6;
+       background: rgba(59, 130, 246, 0.05);
+     }
+     .route-editor-tab:not(.active):hover {
+       color: #1a202c;
+       background: #f0f4f8;
+     }
+    .route-editor-section { display: none; }
+    .route-editor-section.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .admin-shell { margin-top: 80px; }
+      .admin-top { flex-direction: column; gap: 16px; text-align: center; }
+      .grid-3, .grid-2 { grid-template-columns: 1fr; }
+      .modal-content { width: 95%; margin: 5% auto; }
+      .admin-nav { flex-direction: column; }
+    }
+
+    /* Scrollbar Styling */
+    .modal-body::-webkit-scrollbar,
+    div::-webkit-scrollbar {
+      width: 8px;
+    }
+    .modal-body::-webkit-scrollbar-track,
+    div::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .modal-body::-webkit-scrollbar-thumb,
+    div::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover,
+    div::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    @keyframes fadeInRow {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Status Filter Dropdown */
+         #statusFilter {
+       padding: 6px 12px;
+       border-radius: 8px;
+       border: 2px solid #cbd5e1;
+       background: white;
+       font-weight: 600;
+       color: #1e40af;
+       cursor: pointer;
+       transition: all 0.3s ease;
+     }
+     #statusFilter:hover {
+       border-color: #3b82f6;
+     }
+     #statusFilter:focus {
+       outline: none;
+       border-color: #3b82f6;
+       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+     }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Escape HTML to avoid XSS when inserting user-provided content
+    function escapeHtml(s) {
+      if (s === null || s === undefined) return '';
+      return String(s).replace(/[&<>"]|'/g, function(c) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+      });
+    }
+
+    const API_BASE = 'http://localhost:3000/api';
+    let currentBuses = [];
+    // Map real bus number -> display single-series number
+    let busNumberToDisplay = new Map();
+    let currentLogs = [];
+    let statusFilterValue = 'all'; // To hold the current filter status
+    let requestFilterValue = 'all';
+
+    // Socket.io for live-refresh
+    let socket = null;
+    try {
+      if (typeof io === 'function') {
+        socket = io();
+        socket.on('connect', () => console.log('Socket connected (admin):', socket.id));
+        socket.on('busImageUpdated', (payload) => {
+          try {
+            showSuccess('Bus image updated');
+            // Refresh admin bus list to reflect new thumbnail/image
+            loadBuses();
+          } catch (e) { console.error('socket update handler failed', e); }
+        });
+      }
+    } catch (e) { console.warn('Socket.io unavailable', e); }
+
+    async function ensureAuth() {
+      // Try cookie-based session first (server sets HttpOnly cookie on login)
+      try {
+        const r = await fetch(`${API_BASE}/admin/me`, { method: 'GET', credentials: 'include' });
+        if (r.ok) return true;
+      } catch (e) { /* ignore */ }
+
+      // Fallback: try token from localStorage
+      const token = localStorage.getItem('admin_token');
+      if (token) {
+        try {
+          const r2 = await fetch(`${API_BASE}/admin/me`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
+          if (r2.ok) return true;
+        } catch (e) { /* ignore */ }
+      }
+
+      // Not authenticated — redirect to login
+      window.location.href = 'admin.html';
+      return false;
+    }
+
+    async function logout() { 
+      try {
+        await fetch(`${API_BASE}/admin/logout`, { method: 'POST', credentials: 'include' });
+      } catch (e) { /* ignore */ }
+      try { localStorage.removeItem('admin_token'); } catch (e) {}
+      window.location.href = 'admin.html';
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('[data-pane]').forEach(p => p.style.display = 'none');
+      document.getElementById(tab).style.display = 'block';
+      document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+      if (tab === 'settingsPane') {
+        loadSettings();
+      }
+      if (tab === 'approvalsPane') {
+        loadApprovals();
+      }
+    }
+
+    async function makeApiCall(endpoint, method = 'GET', data = null) {
+      const token = localStorage.getItem('admin_token');
+      const options = {
+        method,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      };
+
+      // Attach CSRF token from cookie (double-submit) for state-changing requests
+      try {
+        const cookieVal = (document.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+        if (cookieVal) {
+          const csrf = decodeURIComponent(cookieVal.split('=')[1]);
+          if (csrf) options.headers['x-csrf-token'] = csrf;
+        }
+      } catch (e) { /* ignore */ }
+      
+      if (data) {
+        options.body = JSON.stringify(data);
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}${endpoint}`, options);
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.message || 'API call failed');
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('API Error:', error);
+        showError(error.message);
+        throw error;
+      }
+    }
+
+    function showError(message) {
+      showToast(message, 'error');
+    }
+
+    function showSuccess(message) {
+      showToast(message, 'success');
+    }
+
+    // Toast stack (top-right) that supports multiple messages
+    function ensureToastContainer() {
+      let c = document.getElementById('toastContainer');
+      if (!c) {
+        c = document.createElement('div');
+        c.id = 'toastContainer';
+        c.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;';
+        document.body.appendChild(c);
+      }
+      return c;
+    }
+
+    function showToast(message, type = 'info', ttl = 4500) {
+      const container = ensureToastContainer();
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.style.cssText = 'pointer-events:auto;min-width:220px;max-width:420px;padding:12px 16px;border-radius:10px;color:#04264b;box-shadow:0 6px 20px rgba(2,6,23,0.2);display:flex;align-items:center;justify-content:space-between;gap:12px;transform:translateX(20px);opacity:0;animation:toastIn 320ms ease-out forwards;';
+      if (type === 'error') toast.style.background = '#fff5f5';
+      else if (type === 'success') toast.style.background = '#eff6ff';
+      else if (type === 'warning') toast.style.background = '#fff7ed';
+      else toast.style.background = '#eef2ff';
+
+      toast.innerHTML = `<div style="flex:1;font-weight:600;">${message}</div><button aria-label=\"close\" style=\"background:none;border:none;font-size:18px;cursor:pointer;color:#334155\">&times;</button>`;
+      container.appendChild(toast);
+
+      const closeBtn = toast.querySelector('button');
+      const remove = () => { toast.style.animation = 'toastOut 240ms ease-in forwards'; setTimeout(() => toast.remove(), 260); };
+      closeBtn.addEventListener('click', remove);
+      setTimeout(remove, ttl);
+    }
+
+    // Toast animations
+    (function injectToastStyles(){
+      if (document.getElementById('toastStyles')) return;
+      const s = document.createElement('style');
+      s.id = 'toastStyles';
+      s.textContent = `@keyframes toastIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(20px); opacity: 0; } }`;
+      document.head.appendChild(s);
+    })();
+
+    async function loadLogs() {
+      try {
+        const result = await makeApiCall('/admin/logs');
+        currentLogs = result.logs || [];
+        renderDashboard();
+      } catch (error) {
+        console.error('Failed to load logs:', error);
+      }
+    }
+
+    async function loadBuses() {
+      try {
+        const result = await makeApiCall('/admin/buses');
+        currentBuses = result.buses || [];
+        // Build display numbering 1..N based on sorted real numbers
+        try {
+          const sorted = [...currentBuses].sort((a, b) => Number(a.number) - Number(b.number));
+          busNumberToDisplay = new Map();
+          sorted.forEach((b, i) => busNumberToDisplay.set(String(b.number), String(i + 1)));
+        } catch (e) {
+          busNumberToDisplay = new Map();
+        }
+        renderBuses();
+      } catch (error) {
+        console.error('Failed to load buses:', error);
+      }
+    }
+
+    function filterLogsByStatus() {
+      statusFilterValue = document.getElementById('statusFilter').value;
+      requestFilterValue = document.getElementById('requestFilter') ? document.getElementById('requestFilter').value : 'all';
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      const tbody = document.getElementById('eventsBody');
+
+      const filteredLogs = currentLogs.filter(log => {
+        if (statusFilterValue !== 'all' && log.status !== statusFilterValue) return false;
+        if (requestFilterValue === 'all') return true;
+        if (requestFilterValue === 'requested') return !!log.requested;
+        if (requestFilterValue === 'not_requested') return !log.requested;
+        return true;
+      });
+
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No logs available for this status</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filteredLogs.map(log => {
+        const locRaw = (log.locationName && typeof log.lat === 'number' && typeof log.lng === 'number') ? `${log.locationName} (${log.lat},${log.lng})` : (log.location || '');
+        const loc = escapeHtml(locRaw);
+        const contactSafe = escapeHtml(log.email || '');
+        const requestedBadge = log.requested ? `<span class="badge badge-ok">Requested</span>` : `<span class="badge badge-no">Not Requested</span>`;
+        const statusBadge = `<span class="badge ${log.status === 'AVAILABLE' ? 'badge-ok' : 'badge-no'}">${log.status === 'AVAILABLE' ? '✓ ' : '✗ '}${escapeHtml(log.status)}</span>`;
+        return `
+        <tr style="animation: fadeInRow 0.3s ease-out;">
+          <td>📅 ${escapeHtml(new Date(log.createdAt).toLocaleDateString())}</td>
+          <td>🕐 ${escapeHtml(new Date(log.createdAt).toLocaleTimeString())}</td>
+          <td>✉️ ${contactSafe}</td>
+          <td>📍 ${loc}</td>
+          <td>${requestedBadge}</td>
+          <td>${statusBadge}</td>
+        </tr>
+      `}).join('');
+    }
+
+    function renderBuses() {
+      const list = document.getElementById('busList');
+      if (currentBuses.length === 0) {
+        list.innerHTML = '<div class="loading">No buses found</div>';
+        return;
+      }
+      list.innerHTML = currentBuses.map((bus, idx) => {
+        const displayNum = busNumberToDisplay.get(String(bus.number)) || String(bus.number);
+        const safeName = escapeHtml(bus.name || '');
+        const safeLocation = escapeHtml(bus.location || '');
+        return `
+         <div class="item">
+           <div>
+            <strong style="font-size: 1.1rem; color: #1e40af;">🚌 Bus ${escapeHtml(displayNum)}</strong> 
+            <div style="color: #64748b; margin-top: 4px;">${safeName} • ${safeLocation}</div>
+           </div>
+           <div style="display: flex; gap: 8px;">
+             <button class="btn" onclick="editRoutes('${escapeHtml(bus.number)}')">✏️ Edit Routes</button>
+             <button class="btn danger" onclick="removeBus('${escapeHtml(bus.number)}')">🗑️ Delete</button>
+           </div>
+         </div>
+      `}).join('');
+    }
+
+    async function addBus(e) {
+      e.preventDefault();
+      const num = document.getElementById('busNumber').value.trim();
+      const name = document.getElementById('busName').value.trim();
+      const location = document.getElementById('busLocation').value.trim();
+      
+      if (!num || !name || !location) {
+        showError('Please fill in all fields');
+        return;
+      }
+
+      try {
+        await makeApiCall('/admin/buses', 'POST', {
+          number: num,
+          name: name,
+          location: location
+        });
+        
+        showSuccess('Bus added successfully!');
+        e.target.reset();
+        await loadBuses();
+      } catch (error) {
+        // Error already shown by makeApiCall
+      }
+    }
+
+    async function removeBus(busNumber) {
+      if (!confirm(`Are you sure you want to delete Bus ${busNumber}?`)) {
+        return;
+      }
+
+      try {
+        await makeApiCall(`/admin/buses/${busNumber}`, 'DELETE');
+        showSuccess('Bus deleted successfully!');
+        await loadBuses();
+      } catch (error) {
+        // Error already shown by makeApiCall
+      }
+    }
+
+    // Route editor
+    const routeState = {
+      morning: [],
+      evening: [],
+      capacity: 60,
+      currentOccupancy: 0,
+      driverName: "",
+      driverPhone: "",
+      liveLocationUrl: "",
+      currentBusNumber: null,
+      editing: {
+        morning: null, // index of stop being edited, or null
+        evening: null
+      }
+    };
+
+    async function editRoutes(busNumber) {
+      routeState.currentBusNumber = busNumber;
+      
+      // Load existing routes for this bus
+      routeState.morning = [];
+      routeState.evening = [];
+      const bus = currentBuses.find(b => b.number === busNumber);
+      if (bus) {
+        routeState.capacity = bus.capacity ?? 60;
+        routeState.currentOccupancy = bus.currentOccupancy ?? 0;
+        routeState.driverName = bus.driverName ?? "";
+        routeState.driverPhone = bus.driverPhone ?? "";
+        routeState.liveLocationUrl = bus.liveLocationUrl ?? "";
+        routeState.morning = bus.stops.filter(s => s.period === 'MORNING').map(s => ({
+          name: s.name,
+          coords: `${s.lat},${s.lng}`
+        })).sort((a, b) => a.order - b.order);
+        routeState.evening = bus.stops.filter(s => s.period === 'EVENING').map(s => ({
+          name: s.name,
+          coords: `${s.lat},${s.lng}`
+        })).sort((a, b) => a.order - b.order);
+      }
+
+      const displayNum = busNumberToDisplay.get(String(busNumber)) || String(busNumber);
+      document.getElementById('modalRouteEditorTitle').textContent = `Edit Routes – Bus ${displayNum}`;
+      document.getElementById('busCapacityInput').value = routeState.capacity;
+      document.getElementById('modalBusName').value = bus?.name || '';
+      document.getElementById('modalRouteName').value = bus?.routeName || bus?.location || '';
+      document.getElementById('modalDriverName').value = routeState.driverName;
+      document.getElementById('modalDriverPhone').value = routeState.driverPhone;
+      document.getElementById('modalLiveLocation').value = routeState.liveLocationUrl;
+      document.getElementById('modalMorningStart').value = bus?.morningStartTime || '';
+      document.getElementById('modalMorningEnd').value = bus?.morningEndTime || '';
+      document.getElementById('modalEveningStart').value = bus?.eveningStartTime || '';
+      document.getElementById('modalEveningEnd').value = bus?.eveningEndTime || '';
+      document.getElementById('currentOccupancyInput').value = routeState.currentOccupancy;
+      // Clear file input preview
+      const fileInput = document.getElementById('modalBusImage'); if (fileInput) fileInput.value = '';
+      // Show existing image preview (if present)
+      try {
+        const preview = document.getElementById('modalImagePreview');
+        if (preview) {
+          if (bus && bus.imageUrl) {
+            preview.src = bus.imageUrl;
+            preview.style.display = 'block';
+            const fb = document.getElementById('modalImageFeedback'); if (fb) fb.textContent = 'Current image shown. Choose a new file to replace.';
+          } else {
+            preview.src = '';
+            preview.style.display = 'none';
+            const fb = document.getElementById('modalImageFeedback'); if (fb) fb.textContent = '';
+          }
+        }
+      } catch (e) {}
+      openRouteEditorModal();
+    }
+
+    function openRouteEditorModal() {
+      document.getElementById('routeEditorModal').style.display = 'block';
+      switchRouteEditorTab('morning');
+    }
+
+    function closeRouteEditorModal() {
+      document.getElementById('routeEditorModal').style.display = 'none';
+    }
+
+    function addStop(period) {
+      const nameEl = document.getElementById(`${period}StopName`);
+      const coordEl = document.getElementById(`${period}StopCoords`);
+      const name = nameEl.value.trim();
+      const coords = coordEl.value.trim();
+      
+      if (!name || !coords) {
+        showError('Please fill in both stop name and coordinates');
+        return;
+      }
+
+      // Validate coordinates format
+      const coordParts = coords.split(',');
+      if (coordParts.length !== 2 || isNaN(coordParts[0]) || isNaN(coordParts[1])) {
+        showError('Coordinates must be in format: lat,lng (e.g., 16.5062,80.6480)');
+        return;
+      }
+
+      routeState[period].push({ name, coords });
+      nameEl.value = '';
+      coordEl.value = '';
+      renderStops(period);
+    }
+
+    function renderStops(period) {
+      const box = document.getElementById(`${period}Stops`);
+      box.innerHTML = ''; // Clear existing stops
+
+      let draggedIndex = null;
+      const isEditingThisPeriod = (index) => routeState.editing[period] === index;
+
+      if (routeState[period].length === 0) {
+        box.innerHTML = '<div class="small" style="text-align:center; padding:10px;">No stops added yet.</div>';
+        return;
+      }
+
+      routeState[period].forEach((s, i) => {
+        const item = document.createElement('div');
+        item.className = 'item';
+        item.setAttribute('draggable', 'true');
+        item.dataset.index = i;
+
+        if (isEditingThisPeriod(i)) {
+          item.innerHTML = `
+            <div style="flex:1; display:flex; gap:8px;">
+              <input class="form-input" id="edit-stop-name-${period}" value="${s.name}">
+              <input class="form-input" id="edit-stop-coords-${period}" value="${s.coords}">
+            </div>
+            <div>
+              <button class="btn primary" onclick="saveStopEdit('${period}', ${i})">✓ Save</button>
+              <button class="btn" onclick="cancelStopEdit('${period}')">✗ Cancel</button>
+            </div>
+          `;
+        } else {
+          item.innerHTML = `
+            <div>${i + 1}. ${s.name} <span class="small">(${s.coords})</span></div>
+            <div>
+              <button class="btn" onclick="toggleEdit('${period}', ${i})">✏️ Edit</button>
+              <button class="btn danger" onclick="removeStop('${period}', ${i})">🗑️ Remove</button>
+            </div>
+          `;
+        }
+
+        // Drag and Drop event listeners
+        item.addEventListener('dragstart', (e) => {
+          draggedIndex = i;
+          e.target.classList.add('dragging');
+        });
+
+        item.addEventListener('dragend', (e) => {
+          e.target.classList.remove('dragging');
+          draggedIndex = null;
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          document.querySelectorAll(`#${period}Stops .item`).forEach(el => el.classList.remove('drag-over'));
+          e.currentTarget.classList.add('drag-over');
+        });
+
+        item.addEventListener('dragleave', (e) => {
+          e.currentTarget.classList.remove('drag-over');
+        });
+
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          document.querySelectorAll(`#${period}Stops .item`).forEach(el => el.classList.remove('drag-over'));
+          const droppedOnIndex = i;
+          moveStop(period, draggedIndex, droppedOnIndex);
+        });
+
+        box.appendChild(item);
+      });
+    }
+
+    function removeStop(period, idx) { 
+      routeState[period].splice(idx, 1); 
+      renderStops(period); 
+    }
+
+    function toggleEdit(period, index) {
+      // Cancel any other edit in the same modal
+      routeState.editing.morning = null;
+      routeState.editing.evening = null;
+      routeState.editing[period] = index;
+      renderStops('morning');
+      renderStops('evening');
+    }
+
+    function saveStopEdit(period, index) {
+      const newName = document.getElementById(`edit-stop-name-${period}`).value.trim();
+      const newCoords = document.getElementById(`edit-stop-coords-${period}`).value.trim();
+
+      if (!newName || !newCoords) {
+        showError('Stop name and coordinates cannot be empty.');
+        return;
+      }
+
+      routeState[period][index] = { name: newName, coords: newCoords };
+      routeState.editing[period] = null;
+      renderStops(period);
+    }
+
+    function cancelStopEdit(period) {
+      routeState.editing[period] = null;
+      renderStops(period);
+    }
+
+    function moveStop(period, fromIndex, toIndex) {
+      if (fromIndex === null || fromIndex === toIndex) return;
+
+      const item = routeState[period].splice(fromIndex, 1)[0];
+      routeState[period].splice(toIndex, 0, item);
+
+      // Re-render to update order and numbering
+      renderStops(period);
+    }
+
+    async function saveRoutes() {
+      if (!routeState.currentBusNumber) {
+        showError('No bus selected for route editing');
+        return;
+      }
+
+      try {
+        const capacity = parseInt(document.getElementById('busCapacityInput').value, 10);
+        const currentOccupancy = parseInt(document.getElementById('currentOccupancyInput').value, 10);
+        const name = document.getElementById('modalBusName').value.trim();
+        const routeName = document.getElementById('modalRouteName').value.trim();
+        const driverName = document.getElementById('modalDriverName').value.trim();
+        const driverPhone = document.getElementById('modalDriverPhone').value.trim();
+        const liveLocationUrl = document.getElementById('modalLiveLocation').value.trim();
+        const morningStartTime = document.getElementById('modalMorningStart').value || null;
+        const morningEndTime = document.getElementById('modalMorningEnd').value || null;
+        const eveningStartTime = document.getElementById('modalEveningStart').value || null;
+        const eveningEndTime = document.getElementById('modalEveningEnd').value || null;
+
+        const morningStops = routeState.morning.map((s, idx) => {
+          const [lat, lng] = s.coords.split(',');
+          return { name: s.name, lat: parseFloat(lat), lng: parseFloat(lng), order: idx + 1 };
+        });
+
+        const eveningStops = routeState.evening.map((s, idx) => {
+          const [lat, lng] = s.coords.split(',');
+          return { name: s.name, lat: parseFloat(lat), lng: parseFloat(lng) };
+        });
+
+        await makeApiCall(`/admin/buses/${routeState.currentBusNumber}`, 'PUT', {
+          name: name || currentBuses.find(b => b.number === routeState.currentBusNumber).name,
+          routeName: routeName || currentBuses.find(b => b.number === routeState.currentBusNumber).routeName || currentBuses.find(b => b.number === routeState.currentBusNumber).location,
+          capacity: isNaN(capacity) ? 60 : capacity,
+          driverName: driverName,
+          driverPhone: driverPhone,
+          liveLocationUrl: liveLocationUrl,
+          currentOccupancy: isNaN(currentOccupancy) ? 0 : currentOccupancy,
+          morningStartTime,
+          morningEndTime,
+          eveningStartTime,
+          eveningEndTime,
+          morningStops,
+          eveningStops
+        });
+
+        // If an image file is selected, upload it separately and update UI immediately
+        const fileInput = document.getElementById('modalBusImage');
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          try {
+            const token = localStorage.getItem('admin_token');
+            const fd = new FormData(); fd.append('photo', file);
+            const upRes = await fetch(`${API_BASE}/admin/buses/${routeState.currentBusNumber}/photo`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` },
+              body: fd
+            });
+
+            const contentType = upRes.headers.get('content-type') || '';
+            if (upRes.ok) {
+              let upJson = {};
+              if (contentType.includes('application/json')) {
+                upJson = await upRes.json();
+              }
+              // Update local bus record and re-render
+              const newImageUrl = (upJson && upJson.imageUrl) ? upJson.imageUrl : `/uploads/${routeState.currentBusNumber}_image${file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : ''}`;
+              // Update currentBuses in-place
+              const cbus = currentBuses.find(b => String(b.number) === String(routeState.currentBusNumber));
+              if (cbus) { cbus.imageUrl = newImageUrl; }
+              // Update modal preview if available
+              try {
+                const previewEl = document.getElementById('modalImagePreview');
+                if (previewEl) {
+                  previewEl.src = (upJson && (upJson.thumbnailUrl || upJson.imageUrl)) ? (upJson.thumbnailUrl || upJson.imageUrl) : newImageUrl;
+                  previewEl.style.display = 'block';
+                }
+              } catch (pe) {}
+              await loadBuses(); // reload admin list
+              showSuccess('Image uploaded');
+            } else {
+              // Try parse error message
+              try {
+                if (contentType.includes('application/json')) {
+                  const errJson = await upRes.json();
+                  showError(errJson.message || 'Failed to upload image');
+                } else {
+                  const text = await upRes.text();
+                  const firstLine = (text || '').split('\n')[0].slice(0, 300);
+                  showError(firstLine || 'Failed to upload image');
+                }
+              } catch (parseErr) {
+                console.error('Upload response parse failed', parseErr);
+                showError('Failed to upload image');
+              }
+            }
+          } catch (uerr) {
+            console.error('Upload failed', uerr);
+            showError(uerr && uerr.message ? uerr.message : 'Image upload failed');
+          }
+        }
+
+        showSuccess('Routes saved successfully!');
+        closeRouteEditorModal();
+        await loadBuses();
+      } catch (error) {
+        // Error already shown by makeApiCall
+      }
+    }
+
+    function switchRouteEditorTab(period) {
+      // When switching tabs, cancel any ongoing edit
+      routeState.editing.morning = null;
+      routeState.editing.evening = null;
+      document.querySelectorAll('.route-editor-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.route-editor-section').forEach(s => s.style.display = 'none');
+      const tabBtn = document.querySelector(`[data-route-tab="${period}"]`);
+      if (tabBtn) tabBtn.classList.add('active');
+      if (period === 'morning' || period === 'evening') {
+        const section = document.getElementById(`${period}RouteSection`);
+        if (section) section.style.display = 'block';
+        renderStops(period);
+      } else if (period === 'details') {
+        const section = document.getElementById('detailsSection');
+        if (section) section.style.display = 'block';
+      }
+    }
+
+    window.addEventListener('load', async () => {
+      if (!(await ensureAuth())) return;
+      
+      switchTab('dashboardPane');
+      // figure out if superadmin
+      try {
+        const me = await makeApiCall('/admin/me', 'GET');
+        if (me && me.admin && me.admin.role === 'superadmin') {
+          document.getElementById('approvalsTab').style.display = 'inline-block';
+        }
+      } catch {}
+      await Promise.all([loadLogs(), loadBuses()]);
+      // Attach file input change handler for client-side validation and preview
+      try {
+        const fileInput = document.getElementById('modalBusImage');
+        const preview = document.getElementById('modalImagePreview');
+        const fb = document.getElementById('modalImageFeedback');
+        if (fileInput) {
+          fileInput.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) {
+              if (preview) { preview.src = ''; preview.style.display = 'none'; }
+              if (fb) fb.textContent = '';
+              return;
+            }
+            // Validate type
+            if (!f.type || !f.type.startsWith('image/')) {
+              if (fb) fb.textContent = 'Only image files are allowed.';
+              if (preview) { preview.src = ''; preview.style.display = 'none'; }
+              return;
+            }
+            // Validate size (5MB)
+            const maxBytes = 5 * 1024 * 1024;
+            if (f.size > maxBytes) {
+              if (fb) fb.textContent = 'File is too large. Max 5 MB allowed.';
+              if (preview) { preview.src = ''; preview.style.display = 'none'; }
+              return;
+            }
+            // Show preview
+            try {
+              const url = URL.createObjectURL(f);
+              if (preview) { preview.src = url; preview.style.display = 'block'; }
+              if (fb) fb.textContent = `Selected: ${f.name} (${Math.round(f.size/1024)} KB)`;
+            } catch (err) {
+              if (fb) fb.textContent = 'Preview not available.';
+            }
+          });
+        }
+      } catch (e) { console.warn('Attach file handler failed', e); }
+    });
+
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${API_BASE.replace('/api', '')}/api/settings`);
+        const data = await res.json();
+        if (!data.success) return;
+        const s = data.settings || {};
+        document.getElementById('settingsTitle').value = s.siteTitle || '';
+        document.getElementById('settingsOrg').value = s.organizationName || '';
+        document.getElementById('settingsAddress').value = s.contact?.address || '';
+        document.getElementById('settingsPhone').value = s.contact?.phone || '';
+        document.getElementById('settingsEmail').value = s.contact?.email || '';
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      try {
+        const payload = {
+          siteTitle: document.getElementById('settingsTitle').value.trim(),
+          organizationName: document.getElementById('settingsOrg').value.trim(),
+          contact: {
+            address: document.getElementById('settingsAddress').value.trim(),
+            phone: document.getElementById('settingsPhone').value.trim(),
+            email: document.getElementById('settingsEmail').value.trim()
+          }
+        };
+        await makeApiCall('/admin/settings', 'PUT', payload);
+        showSuccess('Settings saved!');
+      } catch (e) {
+        // makeApiCall shows error
+      }
+    }
+
+    async function loadApprovals() {
+      try {
+        const res = await makeApiCall('/admin/requests', 'GET');
+        const reqs = (res && res.requests) || [];
+        const list = document.getElementById('approvalsList');
+        if (reqs.length === 0) {
+          list.innerHTML = '<div class=\"loading\">No pending requests</div>';
+          return;
+        }
+        list.innerHTML = reqs.map(r => `
+          <div class=\"item\">
+            <div>
+              <strong>${r.name}</strong>
+              <div class=\"small\">${r.email}</div>
+              <div class=\"small\">Requested: ${new Date(r.createdAt).toLocaleString()}</div>
+            </div>
+            <div style=\"display:flex; gap:8px;\">
+              <button class=\"btn primary\" onclick=\"approveAdmin('${encodeURIComponent(r.email)}')\">Approve</button>
+              <button class=\"btn danger\" onclick=\"rejectAdmin('${encodeURIComponent(r.email)}')\">Reject</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        // makeApiCall shows error
+      }
+    }
+
+    async function approveAdmin(emailEnc) {
+      try {
+        await makeApiCall(`/admin/requests/${emailEnc}/approve`, 'POST');
+        showSuccess('Approved'); loadApprovals();
+      } catch {}
+    }
+    async function rejectAdmin(emailEnc) {
+      try {
+        await makeApiCall(`/admin/requests/${emailEnc}/reject`, 'POST');
+        showSuccess('Rejected'); loadApprovals();
+      } catch {}
+    }
+  </script>
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-top">
+      <div class="admin-title">Admin Dashboard</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="admin-nav">
+      <button class="admin-tab" data-tab="dashboardPane" onclick="switchTab('dashboardPane')">Bus Availability Logs</button>
+      <button class="admin-tab" data-tab="busesPane" onclick="switchTab('busesPane')">Edit Bus Details</button>
+      <button class="admin-tab" data-tab="settingsPane" onclick="switchTab('settingsPane')">Settings</button>
+      <button class="admin-tab" data-tab="approvalsPane" onclick="switchTab('approvalsPane')" id="approvalsTab" style="display:none;">Admin Requests</button>
+    </div>
+
+    <!-- Dashboard Pane -->
+    <div id="dashboardPane" class="card" data-pane>
+      <div class="section-title"> </div>
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Contact</th>
+            <th>Location</th>
+            <th>Requested
+              <div style="margin-top:6px;">
+                <select id="requestFilter" onchange="filterLogsByStatus()" style="margin-left: 0px; padding: 6px 10px; border-radius: 8px; border: 2px solid #cbd5e1; background: white; font-weight: 600; color: #1e40af;">
+                  <option value="all">All requests</option>
+                  <option value="requested">Requested</option>
+                  <option value="not_requested">Not Requested</option>
+                </select>
+              </div>
+            </th>
+            <th>
+              Status
+              <div style="margin-top:6px;">
+                <select id="statusFilter" onchange="filterLogsByStatus()" style="margin-left: 8px; padding: 6px 10px; border-radius: 8px; border: 2px solid #cbd5e1; background: white; font-weight: 600; color: #1e40af;">
+                  <option value="all">All</option>
+                  <option value="AVAILABLE">Available</option>
+                  <option value="UNAVAILABLE">Unavailable</option>
+                </select>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="eventsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Approvals Pane (superadmin only) -->
+    <div id="approvalsPane" class="card" data-pane style="display:none;">
+      <div class="section-title"> Approve New Admins</div>
+      <div id="approvalsList" class="list"></div>
+    </div>
+    <!-- Buses Pane -->
+    <div id="busesPane" class="card" data-pane style="display:none;">
+      <div class="section-title"> Manage Buses</div>
+      <form onsubmit="addBus(event)" class="grid-3" style="margin-bottom:10px;">
+        <input id="busNumber" class="form-input" placeholder="Bus Number (e.g., 101)" required>
+        <input id="busName" class="form-input" placeholder="Bus Name (e.g., Bus 101)" required>
+        <input id="busLocation" class="form-input" placeholder="Location (e.g., Vijayawada)" required>
+        <div></div>
+        <div></div>
+        <div style="text-align:right;"><button class="btn primary" type="submit">Add Bus</button></div>
+      </form>
+      <div id="busList" class="list"></div>
+    </div>
+
+    <!-- Settings Pane -->
+    <div id="settingsPane" class="card" data-pane style="display:none;">
+      <div class="section-title"> Site Settings</div>
+      <form onsubmit="saveSettings(event)" class="grid-2" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label class="small" for="settingsTitle">Site Title</label>
+          <input id="settingsTitle" class="form-input" placeholder="BUS TRANSPORT DETAILS">
+        </div>
+        <div class="form-group">
+          <label class="small" for="settingsOrg">Organization Name</label>
+          <input id="settingsOrg" class="form-input" placeholder="Your Institution">
+        </div>
+        <div class="form-group">
+          <label class="small" for="settingsAddress">Contact Address</label>
+          <input id="settingsAddress" class="form-input" placeholder="Address line">
+        </div>
+        <div class="form-group">
+          <label class="small" for="settingsPhone">Contact Phone</label>
+          <input id="settingsPhone" class="form-input" placeholder="+91 00000 00000">
+        </div>
+        <div class="form-group">
+          <label class="small" for="settingsEmail">Contact Email</label>
+          <input id="settingsEmail" type="email" class="form-input" placeholder="support@example.com">
+        </div>
+        <div></div>
+        <div style="text-align:right;"><button class="btn primary" type="submit"> Save Settings</button></div>
+      </form>
+      <div class="small">These values control the public site header and footer.</div>
+    </div>
+
+    <!-- Route Editor Modal -->
+    <div id="routeEditorModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalRouteEditorTitle">Edit Routes</h2>
+          <span class="modal-close" onclick="closeRouteEditorModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div class="route-editor-tabs">
+            <button class="route-editor-tab" data-route-tab="details" onclick="switchRouteEditorTab('details')">Details</button>
+            <button class="route-editor-tab" data-route-tab="morning" onclick="switchRouteEditorTab('morning')">Morning Route</button>
+            <button class="route-editor-tab" data-route-tab="evening" onclick="switchRouteEditorTab('evening')">Evening Route</button>
+          </div>
+
+          <div id="detailsSection" class="route-editor-section">
+            <div class="grid-2" style="margin-bottom: 10px;">
+              <div class="form-group">
+                <label for="modalBusName" class="small">Bus Name</label>
+                <input id="modalBusName" type="text" class="form-input" placeholder="e.g., Bus 101">
+              </div>
+              <div class="form-group">
+                <label for="modalRouteName" class="small">Bus Route Name</label>
+                <input id="modalRouteName" type="text" class="form-input" placeholder="e.g., Guntur - College">
+              </div>
+            </div>
+            <div class="grid-2" style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #ddd;">
+            <div class="form-group">
+              <label for="busCapacityInput" class="small">Bus Capacity</label>
+              <input id="busCapacityInput" type="number" class="form-input" placeholder="e.g., 60">
+            </div>
+            <div class="form-group">
+              <label for="currentOccupancyInput" class="small">Current Occupancy</label>
+              <input id="currentOccupancyInput" type="number" class="form-input" placeholder="e.g., 45">
+            </div>
+          </div>
+            <div class="grid-2" style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #ddd;">
+            <div class="form-group">
+              <label for="modalDriverName" class="small">Driver Name</label>
+              <input id="modalDriverName" type="text" class="form-input" placeholder="e.g., John Doe">
+            </div>
+            <div class="form-group">
+              <label for="modalDriverPhone" class="small">Driver Phone</label>
+              <input id="modalDriverPhone" type="text" class="form-input" placeholder="e.g., +91 9876543210">
+            </div>
+          </div>
+            <div class="form-group" style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #ddd;">
+              <label for="modalLiveLocation" class="small">Live Location URL</label>
+              <input id="modalLiveLocation" type="url" class="form-input" placeholder="https://maps.google.com/...">
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 12px;">
+              <div class="form-group">
+                <label class="small">Morning Route Start / End</label>
+                <div style="display:flex; gap:8px;"><input id="modalMorningStart" type="time" class="form-input" placeholder="Start"><input id="modalMorningEnd" type="time" class="form-input" placeholder="End"></div>
+              </div>
+              <div class="form-group">
+                <label class="small">Evening Route Start / End</label>
+                <div style="display:flex; gap:8px;"><input id="modalEveningStart" type="time" class="form-input" placeholder="Start"><input id="modalEveningEnd" type="time" class="form-input" placeholder="End"></div>
+              </div>
+            </div>
+
+            <!-- Other details placed above; Bus picture is last in the details tab -->
+            <div class="form-group" style="margin-bottom: 20px;">
+              <label class="small">Bus Picture (optional)</label>
+              <input id="modalBusImage" type="file" accept="image/*" class="form-input">
+              <div id="modalImageFeedback" class="small" style="margin-top:6px;color:#64748b;"></div>
+              <img id="modalImagePreview" src="" alt="Preview" style="max-width:200px;margin-top:8px;border-radius:8px;display:none;border:1px solid #e2e8f0;">
+            </div>
+          </div>
+
+          <div id="morningRouteSection" class="route-editor-section">
+            <div class="grid-2">
+              <input id="morningStopName" class="form-input" placeholder="Stop name">
+              <input id="morningStopCoords" class="form-input" placeholder="Coordinates (lat,lng)">
+            </div>
+            <div style="text-align:right; margin-top:8px;"><button class="btn" onclick="addStop('morning')"> Add Stop</button></div>
+            <div id="morningStops" class="list"></div>
+          </div>
+
+          <div id="eveningRouteSection" class="route-editor-section">
+            <div class="grid-2">
+              <input id="eveningStopName" class="form-input" placeholder="Stop name">
+              <input id="eveningStopCoords" class="form-input" placeholder="Coordinates (lat,lng)">
+            </div>
+            <div style="text-align:right; margin-top:8px;"><button class="btn" onclick="addStop('evening')"> Add Stop</button></div>
+            <div id="eveningStops" class="list"></div>
+          </div>
+
+          <div style="text-align:right; margin-top:20px; border-top: 1px solid #ddd; padding-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="btn" onclick="closeRouteEditorModal()"> Cancel</button>
+            <button class="btn primary" onclick="saveRoutes()"> Save Routes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

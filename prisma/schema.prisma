@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bus {
+  id        Int      @id @default(autoincrement())
+  number    String   @unique
+  name      String
+  location  String
+  routeName String?
+  imageUrl  String?
+  morningStartTime String?
+  morningEndTime String?
+  eveningStartTime String?
+  eveningEndTime String?
+  capacity  Int      @default(0)
+  currentOccupancy Int @default(0)
+  driverName       String  @default("")
+  driverPhone      String  @default("")
+  liveLocationUrl  String  @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  stops     Stop[]
+}
+
+model Stop {
+  id        Int      @id @default(autoincrement())
+  busId     Int
+  name      String
+  lat       Float
+  lng       Float
+  period    Period
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bus       Bus      @relation(fields: [busId], references: [id])
+
+  @@index([busId, period, order])
+}
+
+model AvailabilityLog {
+  id        Int      @id @default(autoincrement())
+  contact   String   @default("")
+  location  String
+  lat       Float?
+  lng       Float?
+  requested Boolean  @default(false)
+  status    String
+  createdAt DateTime @default(now())
+}
+
+enum Period {
+  MORNING
+  EVENING
+}

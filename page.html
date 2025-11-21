@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bus Transport</title>
+  <!-- External CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <h1 id="siteTitle">BUS TRANSPORT DETAILS</h1>
+    <a href="admin.html" class="admin-link" title="Admin Login">Admin Login</a>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <!-- Bus Checker Section -->
+    <div class="bus-checker hover-box">
+      <h2>Bus Availability Checker</h2>
+      <p>Enter your location to find buses within 1.5km radius</p>
+      
+      <form class="checker-form" id="busForm">
+        <label for="email">Email or Phone</label>
+        <input id="email" placeholder="Enter your email or phone number" required>
+
+        <label for="location">Your Location</label>
+        <div class="location-input">
+          <input type="text" id="location" placeholder="Enter location name (e.g., KR Market, Vijayawada) or coordinates">
+          <button type="button" id="useCurrentLocation" class="current-location-btn" title="Use your device location">📍use current location</button>
+        </div>
+        <small style="color: #666; font-size: 0.8rem; margin-top: 5px; display: block;">
+           Examples: "KR Market, Vijayawada", "Vijayawada Railway Station", or coordinates "16.5062,80.6480"
+        </small>
+        <div style="margin-top:8px; display:flex; gap:12px; align-items:center;">
+          <div style="flex:0 0 220px;">
+            <label for="requestBus" style="font-weight:600; display:block; margin-bottom:6px;">Request a bus for this location?</label>
+            <select id="requestBus" class="form-input" style="width:100%;">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="text-align:center; margin-top:18px;"><button type="submit" class="search-btn">🔍 Search</button></div>
+      </form>
+    </div>
+
+    <!-- Bus Section -->
+    <div class="bus-section hover-box">
+      <h2>Available Buses</h2>
+      <div class="bus-container" id="busContainer"></div>
+    </div>
+
+    
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p id="contactAddress"> Address: Address line</p>
+    <p id="contactPhone"> Contact: +91 00000 00000</p>
+    <p id="contactEmail"> Email: support@example.com</p>
+  </footer>
+
+  <!-- Modal for Bus Route Details -->
+  <div id="routeModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Bus Route Details</h2>
+        <span class="close">&times;</span>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Route Tabs -->
+        <div class="route-tabs">
+          <button class="tab-btn active" data-route="details">Details</button>
+          <button class="tab-btn" data-route="morning">Morning Route</button>
+          <button class="tab-btn" data-route="evening">Evening Route</button>
+        </div>
+        
+        <!-- Route Content -->
+        <div class="route-content">
+        <!-- Details Section -->
+        <div id="detailsRoute" class="route-section active">
+            <div class="description-section">
+              <h4>Driver Details</h4>
+              <p id="driverName">Name: Fetching...</p>
+              <p id="driverPhone">Phone: Fetching...</p>
+            </div>
+            <div class="description-section">
+                <h4>Live Location</h4>
+                <p id="liveLocationLink">Feature coming soon.</p>
+              </div>
+              <div class="description-section">
+                <h4>Schedule</h4>
+                <p id="morningTimes">Morning: Not available</p>
+                <p id="eveningTimes">Evening: Not available</p>
+              </div>
+              <div class="description-section">
+                <h4>Bus Image</h4>
+                <div id="busImageContainer"><img id="busImage" src="" alt="Bus Image" style="max-width:240px; border-radius:8px; display:none;"></div>
+            </div>
+            <div class="description-section">
+              <h4>Occupancy</h4>
+              <p id="busCapacity">Bus Capacity: Fetching...</p>
+              <p id="currentOccupancy">Current Occupancy: Fetching...</p>
+            </div>
+            <div class="description-section">
+              <h4>Bus Route</h4>
+              <div id="busRouteText"></div>
+            </div>
+          </div>
+
+          <!-- Morning Route -->
+          <div id="morningRoute" class="route-section">
+            <div class="route-info">
+              <h3 id="morningRouteTitle">Morning Route</h3>
+              <p id="morningRouteDescription">Route from starting point to college</p>
+            </div>
+            <div class="route-map">
+              <div class="map-placeholder">
+                <div class="map-icon">📍</div>
+                <h4>Morning Route Map</h4>
+                <p id="morningRouteStops">Route: Starting point → Route stops... → College</p>
+                <p class="map-note">Interactive map will be displayed here</p>
+              </div>
+            </div>
+          </div>
+
+          
+          
+          <!-- Evening Route -->
+          <div id="eveningRoute" class="route-section">
+            <div class="route-info">
+              <h3 id="eveningRouteTitle">Evening Route</h3>
+              <p id="eveningRouteDescription">Route from college back to destination</p>
+            </div>
+            <div class="route-map">
+              <div class="map-placeholder">
+                <div class="map-icon">📍</div>
+                <h4>Evening Route Map</h4>
+                <p id="eveningRouteStops">Route: College → Route stops... → Destination</p>
+                <p class="map-note">Interactive map will be displayed here</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- External Script -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
