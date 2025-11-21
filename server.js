@@ -126,6 +126,12 @@ app.use('/api/', apiLimiter);
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Trust proxy - required for Render and other reverse proxy deployments
+// This allows Express to correctly read X-Forwarded-For, X-Forwarded-Proto, etc.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Trust first proxy
+}
+
 // Admin static guard: protect admin pages from anonymous access.
 // This runs BEFORE static file serving to prevent direct access to admin HTML.
 app.use((req, res, next) => {
