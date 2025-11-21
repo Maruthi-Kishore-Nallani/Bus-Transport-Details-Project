@@ -3,11 +3,16 @@ let buses = [];
 // Map of real busNumber -> display number (1..N)
 let busNumberToDisplay = new Map();
 
+// Dynamic API base URL - works in both development and production
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : window.location.origin;
+
 // Socket.io live updates
 let socket = null;
 try {
   if (typeof io === 'function') {
-    socket = io('http://localhost:3000');
+    socket = io(API_BASE_URL);
     socket.on('connect', () => console.log('Socket connected (public):', socket.id));
     socket.on('busImageUpdated', (payload) => {
       console.log('busImageUpdated', payload);
@@ -25,7 +30,7 @@ async function loadBusesFromDatabase() {
     // Show loading state
     container.innerHTML = '<div class="loading">Loading bus data...</div>';
     
-    const response = await fetch('http://localhost:3000/api/routes');
+    const response = await fetch(`${API_BASE_URL}/api/routes`);
     const data = await response.json();
     
     if (data.success) {
@@ -185,7 +190,7 @@ window.addEventListener('resize', adjustMainPadding);
 // Load public site settings and apply to header/footer
 async function applySiteSettings() {
   try {
-    const res = await fetch('http://localhost:3000/api/settings');
+    const res = await fetch(`${API_BASE_URL}/api/settings`);
     const data = await res.json();
     if (!data.success || !data.settings) return;
     const s = data.settings;
@@ -251,7 +256,7 @@ document.getElementById("busForm").addEventListener("submit", async function(e) 
 
   try {
     // Call backend API to check bus availability
-    const response = await fetch('http://localhost:3000/api/check-availability', {
+    const response = await fetch(`${API_BASE_URL}/api/check-availability`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -642,7 +647,7 @@ async function showRouteOnMap(busNumber, mapElementId, type) {
       return;
     }
 
-    const res = await fetch(`http://localhost:3000/api/routes/${busNumber}`);
+    const res = await fetch(`${API_BASE_URL}/api/routes/${busNumber}`);
     const data = await res.json();
     if (!data.success || !data.bus) { console.error('Route not found'); return; }
 
