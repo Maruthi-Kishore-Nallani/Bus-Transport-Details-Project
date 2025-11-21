@@ -55,9 +55,19 @@ const multer = require('multer');
 const http = require('http');
 const { Server: IOServer } = require('socket.io');
 const sharp = require('sharp');
+const logger = require('./logger');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Fail fast in production if JWT secret is not set
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_JWT_SECRET) {
+  console.error('FATAL: ADMIN_JWT_SECRET must be set in production. Generate with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+  process.exit(1);
+}
 const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'dev-secret-change-me';
 const MAIN_ADMIN_EMAIL = process.env.MAIN_ADMIN_EMAIL || '';
 const MAIN_ADMIN_PASSWORD = process.env.MAIN_ADMIN_PASSWORD || '';
@@ -68,17 +78,53 @@ const httpServer = http.createServer(app);
 const io = new IOServer(httpServer, { cors: { origin: '*' } });
 
 io.on('connection', (socket) => {
-  console.log('Socket connected:', socket.id);
+  logger.debug('Socket connected', { socketId: socket.id });
   socket.on('disconnect', () => {
-    // console.log('Socket disconnected', socket.id);
+    logger.debug('Socket disconnected', { socketId: socket.id });
   });
 });
 
 // Middleware
-// Allow CORS with credentials so browser fetch() can receive HttpOnly cookies from the server
-app.use(cors({ origin: true, credentials: true }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// CORS Configuration - restrict origins in production
+const corsOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) 
+  : ['http://localhost:3000'];
+
+app.use(cors({ 
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    if (corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true 
+}));
+
+// Security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable if using inline scripts/styles
+  crossOriginEmbedderPolicy: false
+}));
+
+// Compression for responses
+app.use(compression());
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { success: false, message: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
+
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // Admin static guard: protect admin pages from anonymous access.
 // This runs BEFORE static file serving to prevent direct access to admin HTML.
@@ -249,7 +295,7 @@ function readSettingsFile() {
       return { ...DEFAULT_SETTINGS, ...parsed, contact: { ...DEFAULT_SETTINGS.contact, ...(parsed.contact || {}) } };
     }
   } catch (e) {
-    console.error('Failed to read settings file, using defaults:', e);
+    logger.error('Failed to read settings file, using defaults', { error: e.message });
   }
   return { ...DEFAULT_SETTINGS };
 }
@@ -259,7 +305,7 @@ function writeSettingsFile(settings) {
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
     return true;
   } catch (e) {
-    console.error('Failed to write settings file:', e);
+    logger.error('Failed to write settings file', { error: e.message });
     return false;
   }
 }
@@ -268,9 +314,13 @@ let siteSettings = readSettingsFile();
 
 // Public settings
 app.get('/api/settings', (req, res) => {
-  // Include Google Maps API key from environment (if set).
-  const settingsWithKey = { ...siteSettings, googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || null };
-  res.json({ success: true, settings: settingsWithKey });
+  // DO NOT expose the actual Google Maps API key to clients for security
+  // Instead, return a boolean indicating if Maps functionality is available
+  const settingsPublic = { 
+    ...siteSettings, 
+    mapsEnabled: Boolean(process.env.GOOGLE_MAPS_API_KEY)
+  };
+  res.json({ success: true, settings: settingsPublic });
 });
 
 // Protected update settings
@@ -686,11 +736,18 @@ app.post('/api/admin/login', async (req, res) => {
       if (ok) {
         const token = jwt.sign({ role: 'superadmin', email, id: 'env-superadmin' }, JWT_SECRET, { expiresIn: '8h' });
         // Set http-only cookie so browser navigations can carry auth for admin pages
+        const isProduction = process.env.NODE_ENV === 'production';
+        const cookieOptions = { 
+          httpOnly: true, 
+          sameSite: isProduction ? 'strict' : 'lax', 
+          secure: isProduction || process.env.SECURE_COOKIES === 'true', 
+          maxAge: 8 * 60 * 60 * 1000 
+        };
         try {
-          res.cookie('admin_token', token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 });
+          res.cookie('admin_token', token, cookieOptions);
           // Also set a csrf token cookie (accessible to JS) for double-submit CSRF protection
           const csrf = require('crypto').randomBytes(24).toString('hex');
-          res.cookie('csrf_token', csrf, { httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 });
+          res.cookie('csrf_token', csrf, { ...cookieOptions, httpOnly: false });
         } catch (e) { /* ignore cookie set errors */ }
         return res.json({ success: true, token });
       }
@@ -701,14 +758,21 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
     const token = jwt.sign({ role: 'admin', email: admin.email, id: admin.id }, JWT_SECRET, { expiresIn: '8h' });
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = { 
+      httpOnly: true, 
+      sameSite: isProduction ? 'strict' : 'lax', 
+      secure: isProduction || process.env.SECURE_COOKIES === 'true', 
+      maxAge: 8 * 60 * 60 * 1000 
+    };
     try {
-      res.cookie('admin_token', token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 });
+      res.cookie('admin_token', token, cookieOptions);
       const csrf = require('crypto').randomBytes(24).toString('hex');
-      res.cookie('csrf_token', csrf, { httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 });
+      res.cookie('csrf_token', csrf, { ...cookieOptions, httpOnly: false });
     } catch (e) { /* ignore */ }
     res.json({ success: true, token });
   } catch (e) {
-    console.error('Admin login failed:', e);
+    logger.error('Admin login failed', { error: e.message, stack: e.stack });
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
@@ -822,8 +886,9 @@ app.post('/api/admin/requests/:email/reject', requireAdmin, requireCsrf, (req, r
 // Get availability logs for admin dashboard
 app.get('/api/admin/logs', requireAdmin, async (req, res) => {
   try {
-    // Determine which columns exist in the underlying table so we can build
-    // a safe SELECT that works both before and after migrating to `contact`.
+    // SECURITY NOTE: Using raw SQL to inspect schema columns for backward compatibility.
+    // This query contains no user input and is safe from SQL injection.
+    // Needed because Prisma schema may not match database schema during migrations.
     const colsRes = await prisma.$queryRawUnsafe(`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name ILIKE 'availabilitylog'`);
     const colNames = Array.isArray(colsRes) ? colsRes.map(r => (r && r.column_name) ? String(r.column_name).toLowerCase() : '').filter(Boolean) : [];
 
@@ -837,6 +902,7 @@ app.get('/api/admin/logs', requireAdmin, async (req, res) => {
     }
 
     const selectQuery = `SELECT id, ${emailSelect}, location, lat, lng, status, "createdAt" FROM "AvailabilityLog" ORDER BY "createdAt" DESC LIMIT 100`;
+    // SECURITY NOTE: This query is safe - no user input, constructed from validated column names
     const logs = await prisma.$queryRawUnsafe(selectQuery);
 
     // Enrich with place name if coordinates are available
@@ -926,7 +992,7 @@ app.post('/api/admin/buses', requireAdmin, requireCsrf, async (req, res) => {
 
     res.json({ success: true, message: 'Bus added successfully', bus });
   } catch (e) {
-    console.error('Failed to add bus:', e);
+    logger.error('Failed to add bus', { error: e.message, stack: e.stack });
     res.status(500).json({ success: false, message: 'Failed to add bus' });
   }
 });
@@ -945,7 +1011,8 @@ app.get('/api/admin/buses', requireAdmin, async (req, res) => {
       });
     } catch (innerErr) {
       // Prisma schema/database mismatch (e.g. missing columns) -> fall back to raw queries
-      console.error('Prisma query failed while fetching buses (admin), using raw fallback:', innerErr);
+      // SECURITY NOTE: These queries contain no user input and are safe from SQL injection
+      logger.warn('Prisma query failed while fetching buses (admin), using raw fallback', { error: innerErr.message });
       const rawBuses = await prisma.$queryRawUnsafe('SELECT * FROM "Bus"');
       const allStops = await prisma.stop.findMany({ orderBy: [{ busId: 'asc' }, { order: 'asc' }] });
       const stopsByBus = {};
@@ -1258,12 +1325,15 @@ app.post('/api/check-availability', async (req, res) => {
         // Build fallback insert based on available columns
         try {
           if (cols.includes('contact')) {
+            // SECURITY NOTE: Using parameterized query ($1, $2, etc.) - safe from SQL injection
             // Insert into contact-based schema
             await prisma.$executeRawUnsafe(`INSERT INTO "AvailabilityLog" (contact, location, lat, lng, requested, status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, now())`, contact, locationToSave, userLocation.lat, userLocation.lng, requestBusFlag === true, statusVal);
           } else if (cols.includes('email')) {
+            // SECURITY NOTE: Using parameterized query - safe from SQL injection
             // Old schema: email column present
             await prisma.$executeRawUnsafe(`INSERT INTO "AvailabilityLog" (email, location, lat, lng, status, "createdAt") VALUES ($1, $2, $3, $4, $5, now())`, contact, locationToSave, userLocation.lat, userLocation.lng, statusVal);
           } else {
+            // SECURITY NOTE: Using parameterized query - safe from SQL injection
             // Last resort: try to insert minimal columns if possible
             await prisma.$executeRawUnsafe(`INSERT INTO "AvailabilityLog" (location, lat, lng, status, "createdAt") VALUES ($1, $2, $3, $4, now())`, locationToSave, userLocation.lat, userLocation.lng, statusVal);
           }
@@ -1381,21 +1451,26 @@ app.get('/api/routes', async (req, res) => {
 
 // Start HTTP server (with socket.io attached)
 httpServer.listen(PORT, () => {
-  console.log(`🚌 Bus API Server running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🔍 Check availability: POST http://localhost:${PORT}/api/check-availability`);
+  logger.info('Bus API Server started', { 
+    port: PORT, 
+    nodeEnv: process.env.NODE_ENV || 'development',
+    endpoints: {
+      health: `http://localhost:${PORT}/api/health`,
+      availability: `POST http://localhost:${PORT}/api/check-availability`
+    }
+  });
 });
 
 module.exports = app;
 
 // Global error handler: return JSON for errors (helps client-side uploads and API consumers)
 app.use((err, req, res, next) => {
-  try {
-    console.error('Unhandled error:', err && err.stack ? err.stack : err);
-  } catch (e) {
-    console.error('Error logging failed:', e);
-  }
+  logger.error('Unhandled error', { 
+    error: err.message, 
+    stack: err.stack,
+    path: req.path,
+    method: req.method 
+  });
   if (res.headersSent) return next(err);
   const status = err && err.status ? err.status : 500;
   res.status(status).json({ success: false, message: (err && err.message) ? err.message : 'Internal server error' });

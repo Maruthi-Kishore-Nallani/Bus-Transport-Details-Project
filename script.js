@@ -17,35 +17,7 @@ try {
   }
 } catch (e) { console.warn('Socket not available', e); }
 
-    async function adminLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById('adminEmail').value.trim();
-      const password = document.getElementById('adminPassword').value;
-      const btn = document.getElementById('adminBtn');
-      const err = document.getElementById('adminError');
-      err.textContent = '';
-      err.style.display = 'none';
-      btn.disabled = true; btn.textContent = ' Signing in...';
-      try {
-        const res = await fetch('http://localhost:3000/api/admin/login', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (!data.success) { 
-          err.textContent = data.message || 'Login failed';
-          err.style.display = 'flex';
-        } else {
-          localStorage.setItem('admin_token', data.token);
-          window.location.href = 'admin-dashboard.html';
-        }
-      } catch (e2) {
-        err.textContent = 'Unable to connect to server';
-        err.style.display = 'flex';
-      } finally {
-        btn.disabled = false; btn.textContent = ' Sign In';
-      }
-    }
+
 
 // Load bus data from database API
 async function loadBusesFromDatabase() {
@@ -128,14 +100,21 @@ async function loadBusesFromDatabase() {
 const container = document.getElementById("busContainer");
 
 // Google Maps (interactive) support
-// The API key is loaded dynamically from server settings to avoid hardcoding.
+// The Maps API is loaded via a script tag in the HTML pages that need it.
+// Client code should not have direct access to the API key for security.
+// Instead, Maps functionality is enabled server-side and route maps are
+// rendered using Directions API calls made by the server.
 let googleMapsLoadPromise = null;
 
 function loadGoogleMapsApi() {
   if (window.google && window.google.maps) {
     return Promise.resolve();
   }
+  // If Maps API script is not loaded, check if it's available
+  // For security, the API key is not exposed to clients
+  // Maps functionality should be handled server-side or via pre-loaded script
   if (googleMapsLoadPromise) return googleMapsLoadPromise;
+  
   googleMapsLoadPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector('script[data-gmaps="true"]');
     if (existing) {
@@ -143,18 +122,15 @@ function loadGoogleMapsApi() {
       existing.addEventListener('error', reject);
       return;
     }
-
-    const key = window.SITE_GOOGLE_MAPS_KEY || null;
-    if (!key) return reject(new Error('Google Maps API key not available'));
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
-    script.async = true;
-    script.defer = true;
-    script.setAttribute('data-gmaps', 'true');
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Maps JS API'));
-    document.head.appendChild(script);
+    
+    // Check if Maps is enabled from settings
+    if (!window.SITE_MAPS_ENABLED) {
+      return reject(new Error('Google Maps functionality is not enabled'));
+    }
+    
+    // Maps script should be loaded in HTML or Maps features won't work
+    // This is a security improvement - the API key is not in client JS
+    return reject(new Error('Google Maps script not found. Load it in HTML with restricted key.'));
   });
   return googleMapsLoadPromise;
 }
@@ -221,8 +197,8 @@ async function applySiteSettings() {
     if (addrEl) addrEl.textContent = ` Address: ${s.contact?.address || 'Address line'}`;
     if (phoneEl) phoneEl.textContent = ` Contact: ${s.contact?.phone || '+91 00000 00000'}`;
     if (emailEl) emailEl.textContent = ` Email: ${s.contact?.email || 'support@example.com'}`;
-    // Expose Google Maps key to loader
-    try { window.SITE_GOOGLE_MAPS_KEY = s.googleMapsApiKey || null; } catch (e) { window.SITE_GOOGLE_MAPS_KEY = null; }
+    // Store maps availability flag
+    try { window.SITE_MAPS_ENABLED = Boolean(s.mapsEnabled); } catch (e) { window.SITE_MAPS_ENABLED = false; }
   } catch (e) {
     // Silently ignore, defaults remain
   }

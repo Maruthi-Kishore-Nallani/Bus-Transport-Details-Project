@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: bus-transport-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: ADMIN_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: MAIN_ADMIN_EMAIL
+        sync: false
+      - key: MAIN_ADMIN_PASSWORD
+        sync: false
+      - key: GEOCODE_COUNTRY
+        value: IN
+      - key: GEOCODE_REGION
+        value: ap
+      - key: SEARCH_RADIUS_KM
+        value: 1.5
+      - key: AVAILABILITY_RATE_LIMIT_PER_HOUR
+        value: 200
+      - key: AVAILABILITY_LIMIT_PER_CONTACT_PER_HOUR
+        value: 60
+      - key: LOGIN_MAX_ATTEMPTS
+        value: 6
+      - key: LOGIN_WINDOW_MS
+        value: 900000
+      - key: GOOGLE_MAPS_DAILY_LIMIT
+        value: 1000
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SECURE_COOKIES
+        value: true
+      - key: LOG_LEVEL
+        value: INFO

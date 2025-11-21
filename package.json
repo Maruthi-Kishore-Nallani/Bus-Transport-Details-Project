@@ -5,24 +5,31 @@
   "main": "server.js",
   "scripts": {
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "generate": "prisma generate",
+    "test:env": "node -e \"console.log('Environment check:'); console.log('NODE_ENV:', process.env.NODE_ENV); console.log('JWT Secret set:', !!process.env.ADMIN_JWT_SECRET); console.log('DB URL set:', !!process.env.DATABASE_URL); console.log('Google Maps key set:', !!process.env.GOOGLE_MAPS_API_KEY);\""
   },
   "dependencies": {
     "@prisma/client": "^6.16.1",
-    "multer": "^1.4.5-lts.1",
-    "sharp": "^0.32.0",
-    "socket.io": "^4.8.1",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
     "geolib": "^3.3.4",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "prisma": "^6.16.1"
+    "multer": "^1.4.5-lts.1",
+    "prisma": "^6.16.1",
+    "sharp": "^0.32.0",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
