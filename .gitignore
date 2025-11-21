@@ -3,7 +3,6 @@ node_modules/
 .DS_Store
 dist/
 build/
-prisma/migrations/
 .vscode/
 *.log
 pending_admins.json
