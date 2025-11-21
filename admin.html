@@ -108,6 +108,9 @@
     .admin-error::before { content: ''; font-size: 1.2rem; }
   </style>
   <script>
+    // Dynamic API URL - detects localhost vs production
+    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin;
+    
     async function adminLogin(e) {
       e.preventDefault();
       const email = document.getElementById('adminEmail').value.trim();
@@ -116,9 +119,9 @@
       const err = document.getElementById('adminError');
       err.textContent = '';
       err.style.display = 'none';
-      btn.disabled = true; btn.textContent = ' Signing in...';
+      btn.disabled = true; btn.textContent = '🔄 Signing in...';
       try {
-        const res = await fetch('/api/admin/login', {
+        const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });

@@ -20,6 +20,9 @@
     .back { display:block; text-align:center; margin-top:14px; color:#1e40af; text-decoration:none; }
   </style>
   <script>
+    // Dynamic API URL - detects localhost vs production
+    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin;
+    
     async function submitSignup(e) {
       e.preventDefault();
       const name = document.getElementById('name').value.trim();
@@ -28,7 +31,7 @@
       const msg = document.getElementById('msg');
       msg.style.display = 'none'; msg.textContent=''; msg.className='msg';
       try {
-        const res = await fetch('http://localhost:3000/api/admin/signup-request', {
+        const res = await fetch(`${API_BASE_URL}/api/admin/signup-request`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password })

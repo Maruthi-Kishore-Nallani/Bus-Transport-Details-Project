@@ -386,7 +386,9 @@
       });
     }
 
-    const API_BASE = 'http://localhost:3000/api';
+    // Dynamic API URL - detects localhost vs production
+    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin;
+    const API_BASE = `${API_BASE_URL}/api`;
     let currentBuses = [];
     // Map real bus number -> display single-series number
     let busNumberToDisplay = new Map();
