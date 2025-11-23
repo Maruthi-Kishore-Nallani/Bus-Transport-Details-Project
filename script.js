@@ -127,15 +127,21 @@ function loadGoogleMapsApi() {
       existing.addEventListener('error', reject);
       return;
     }
-    
-    // Check if Maps is enabled from settings
-    if (!window.SITE_MAPS_ENABLED) {
-      return reject(new Error('Google Maps functionality is not enabled'));
-    }
-    
-    // Maps script should be loaded in HTML or Maps features won't work
-    // This is a security improvement - the API key is not in client JS
-    return reject(new Error('Google Maps script not found. Load it in HTML with restricted key.'));
+
+    // Try to obtain a dev maps key from server (server exposes /api/maps-key only when NODE_ENV !== 'production')
+    fetch(`${API_BASE_URL}/api/maps-key`).then(async (r) => {
+      if (!r.ok) return reject(new Error('Google Maps script not found. Load it in HTML with restricted key.'));
+      const j = await r.json();
+      if (!j || !j.key) return reject(new Error('No maps key available'));
+
+      const s = document.createElement('script');
+      s.setAttribute('data-gmaps', 'true');
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(j.key)}&libraries=places`;
+      s.async = true; s.defer = true;
+      s.addEventListener('load', () => resolve());
+      s.addEventListener('error', () => reject(new Error('Failed loading Google Maps script')));
+      document.head.appendChild(s);
+    }).catch(() => reject(new Error('Google Maps script not found. Load it in HTML with restricted key.')));
   });
   return googleMapsLoadPromise;
 }
@@ -209,6 +215,33 @@ async function applySiteSettings() {
   }
 }
 
+// Check fees structure PDF availability and update public section
+async function checkFeesPdf() {
+  const msgEl = document.getElementById('feesPdfMessage');
+  const dlEl = document.getElementById('feesPdfDownload');
+  if (!msgEl || !dlEl) return; // Section not present
+  try {
+    msgEl.textContent = 'Checking availability...';
+    const res = await fetch(`${API_BASE_URL}/api/fees-structure`);
+    if (!res.ok) throw new Error('Status fetch failed');
+    const data = await res.json();
+    if (data.available) {
+      const sizeKB = data.size ? (data.size / 1024).toFixed(1) : 'Unknown';
+      const updated = data.updatedAt ? new Date(data.updatedAt).toLocaleString() : 'Recently';
+      msgEl.textContent = `Available • ${sizeKB} KB • Updated ${updated}`;
+      dlEl.href = '/uploads/fees-structure.pdf';
+      dlEl.style.display = 'inline-block';
+    } else {
+      msgEl.textContent = 'Fees structure not uploaded yet.';
+      dlEl.style.display = 'none';
+    }
+  } catch (e) {
+    console.error(e);
+    msgEl.textContent = 'Unable to load fees structure status.';
+    dlEl.style.display = 'none';
+  }
+}
+
 // Function to render bus cards
 function renderBuses(list) {
     container.innerHTML = "";
@@ -236,6 +269,7 @@ function renderBuses(list) {
 loadBusesFromDatabase();
 // Apply site settings on load
 applySiteSettings();
+checkFeesPdf();
 
 // Search functionality
 document.getElementById("busForm").addEventListener("submit", async function(e) {
@@ -255,6 +289,35 @@ document.getElementById("busForm").addEventListener("submit", async function(e) 
   submitBtn.disabled = true;
 
   try {
+    // Prepare location payload: if user supplied coordinates use them, otherwise
+    // attempt server-side geocoding for place names to avoid 400 responses.
+    let locationToSend = location;
+    if (typeof location === 'string') {
+      const coordMatch = location.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
+      if (coordMatch) {
+        locationToSend = { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) };
+      } else {
+        // Try server-side geocode
+        try {
+          const geores = await fetch(`${API_BASE_URL}/api/geocode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location })
+          });
+          const gj = await geores.json();
+          if (geores.ok && gj && gj.success && gj.location && typeof gj.location.lat === 'number') {
+            locationToSend = { lat: gj.location.lat, lng: gj.location.lng };
+          } else {
+            showNotification(`Could not find location "${location}". Please provide coordinates as \"lat,lng\" or a valid location name.`, 'error');
+            return;
+          }
+        } catch (e) {
+          showNotification('Failed to resolve location. Try coordinates or try again.', 'error');
+          return;
+        }
+      }
+    }
+
     // Call backend API to check bus availability
     const response = await fetch(`${API_BASE_URL}/api/check-availability`, {
       method: 'POST',
@@ -263,7 +326,7 @@ document.getElementById("busForm").addEventListener("submit", async function(e) 
       },
       body: JSON.stringify({
           email: contact,
-          location: location,
+          location: locationToSend,
           requestBus: (document.getElementById('requestBus') && document.getElementById('requestBus').value === 'yes')
         })
     });

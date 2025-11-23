@@ -196,13 +196,19 @@ curl https://yourdomain.com/api/settings
 ```
 Should have `"mapsEnabled": true` but NO `googleMapsApiKey`
 
-3. **Test Admin Login:**
+### Test Admin Login:**
 - Go to: `https://yourdomain.com/admin.html`
 - Login with: `maruthikishore0117@gmail.com` and your NEW password
 
 4. **Test Bus Search:**
 - Go to: `https://yourdomain.com/page.html`
 - Try searching for a location
+
+5. **Test Fees Structure Upload (Optional):**
+- Login to admin dashboard
+- Go to Settings tab
+- Upload a fees structure PDF (max 4MB)
+- Verify download button appears on public page
 
 5. **Check HTTPS:**
 - Look for green padlock in browser

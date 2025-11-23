@@ -127,7 +127,33 @@
         });
         const data = await res.json();
         if (!data.success) { 
-          err.textContent = data.message || 'Login failed';
+          let msg = data.message || 'Login failed';
+          if (res.status === 429) {
+            // Include remaining time / attempts if server provided details
+            const attemptsUsed = typeof data.attemptsUsed === 'number' ? data.attemptsUsed : undefined;
+            const maxAttempts = typeof data.maxAttempts === 'number' ? data.maxAttempts : undefined;
+            const retryAfter = typeof data.retryAfterSeconds === 'number' ? data.retryAfterSeconds : undefined;
+            if (maxAttempts !== undefined) {
+              msg += ` (Attempts used: ${attemptsUsed ?? '?'}/${maxAttempts}. Locked for ${retryAfter ?? 0}s)`;
+            }
+            // Disable button during lockout to prevent spam requests
+            if (retryAfter && retryAfter > 0) {
+              let remaining = retryAfter;
+              btn.disabled = true;
+              const originalText = ' Sign In';
+              const timer = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                  clearInterval(timer);
+                  btn.disabled = false;
+                  btn.textContent = originalText;
+                } else {
+                  btn.textContent = `⏳ Wait ${remaining}s`;
+                }
+              }, 1000);
+            }
+          }
+          err.textContent = msg;
           err.style.display = 'flex';
         } else {
             // store token for API clients, also server sets httpOnly cookie when credentials are included

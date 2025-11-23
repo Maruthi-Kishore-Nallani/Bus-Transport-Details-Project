@@ -215,6 +215,14 @@ curl https://bus-transport-api.onrender.com/api/settings
 3. Search for buses
 4. Should work without errors
 
+### E. Test Fees Structure Feature (Optional)
+
+1. Login to admin dashboard
+2. Navigate to Settings tab
+3. Upload a fees structure PDF (max 4MB)
+4. Check public page - download button should appear
+5. Click to download and verify PDF opens correctly
+
 ---
 
 ## 🎨 Step 7: Set Up Frontend (If Separate)

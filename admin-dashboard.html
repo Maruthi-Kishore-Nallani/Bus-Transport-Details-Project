@@ -400,7 +400,9 @@
     let socket = null;
     try {
       if (typeof io === 'function') {
-        socket = io();
+        // Explicitly connect to API base with transports and path to improve
+        // behavior behind proxies (Render, reverse proxies) and prefer websocket.
+        socket = io(API_BASE_URL, { transports: ['websocket', 'polling'], path: '/socket.io' });
         socket.on('connect', () => console.log('Socket connected (admin):', socket.id));
         socket.on('busImageUpdated', (payload) => {
           try {
@@ -593,21 +595,42 @@
       }
 
       tbody.innerHTML = filteredLogs.map(log => {
-        const locRaw = (log.locationName && typeof log.lat === 'number' && typeof log.lng === 'number') ? `${log.locationName} (${log.lat},${log.lng})` : (log.location || '');
-        const loc = escapeHtml(locRaw);
+        // We store unified label in log.location (e.g. "Some Place (lat, lng)" or just "(lat, lng)" for older rows).
+        // Render a placeholder span we can enrich asynchronously if only raw coordinates.
         const contactSafe = escapeHtml(log.email || '');
         const requestedBadge = log.requested ? `<span class="badge badge-ok">Requested</span>` : `<span class="badge badge-no">Not Requested</span>`;
         const statusBadge = `<span class="badge ${log.status === 'AVAILABLE' ? 'badge-ok' : 'badge-no'}">${log.status === 'AVAILABLE' ? '✓ ' : '✗ '}${escapeHtml(log.status)}</span>`;
+        // Determine coordinates: prefer explicit lat/lng columns; else try to parse from location string
+        let latVal = (typeof log.lat === 'number') ? log.lat : null;
+        let lngVal = (typeof log.lng === 'number') ? log.lng : null;
+        if ((latVal === null || lngVal === null) && typeof log.location === 'string') {
+          const m = log.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+            if (m) { latVal = parseFloat(m[1]); lngVal = parseFloat(m[2]); }
+        }
+        // Initial display: use the raw location or coords; enrichment will replace if needed
+        let initialText = '';
+        if (typeof log.location === 'string' && /.+\(\s*-?\d+/.test(log.location)) {
+          // Already contains address + coords
+          initialText = log.location;
+        } else if (latVal !== null && lngVal !== null) {
+          initialText = `(${latVal.toFixed(6)}, ${lngVal.toFixed(6)})`;
+        } else {
+          initialText = log.location ? String(log.location) : '—';
+        }
+        const safeInitial = escapeHtml(initialText);
         return `
-        <tr style="animation: fadeInRow 0.3s ease-out;">
-          <td>📅 ${escapeHtml(new Date(log.createdAt).toLocaleDateString())}</td>
-          <td>🕐 ${escapeHtml(new Date(log.createdAt).toLocaleTimeString())}</td>
-          <td>✉️ ${contactSafe}</td>
-          <td>📍 ${loc}</td>
-          <td>${requestedBadge}</td>
-          <td>${statusBadge}</td>
-        </tr>
-      `}).join('');
+          <tr style="animation: fadeInRow 0.3s ease-out;">
+            <td>📅 ${escapeHtml(new Date(log.createdAt).toLocaleDateString())}</td>
+            <td>🕐 ${escapeHtml(new Date(log.createdAt).toLocaleTimeString())}</td>
+            <td>✉️ ${contactSafe}</td>
+            <td>📍 <span class="loc-cell" data-lat="${latVal !== null ? latVal : ''}" data-lng="${lngVal !== null ? lngVal : ''}" data-raw="${escapeHtml(log.location || '')}">${safeInitial}</span></td>
+            <td>${requestedBadge}</td>
+            <td>${statusBadge}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Server now enriches coordinate-only entries; client enrichment disabled to avoid extra API calls.
     }
 
     function renderBuses() {
@@ -945,9 +968,19 @@
           try {
             const token = localStorage.getItem('admin_token');
             const fd = new FormData(); fd.append('photo', file);
+            // Include cookies (admin_token + csrf_token) and attach CSRF header for protection
+            const uploadHeaders = { 'Authorization': `Bearer ${token}` };
+            try {
+              const cookieVal = (document.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+              if (cookieVal) {
+                const csrf = decodeURIComponent(cookieVal.split('=')[1]);
+                if (csrf) uploadHeaders['x-csrf-token'] = csrf;
+              }
+            } catch (e) { /* ignore cookie parse errors */ }
             const upRes = await fetch(`${API_BASE}/admin/buses/${routeState.currentBusNumber}/photo`, {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}` },
+              credentials: 'include',
+              headers: uploadHeaders,
               body: fd
             });
 
@@ -1085,6 +1118,8 @@
       } catch (e) {
         // ignore
       }
+      // After loading settings, refresh fees PDF status
+      try { await checkFeesPdf(); } catch (e) { /* ignore */ }
     }
 
     async function saveSettings(e) {
@@ -1144,6 +1179,66 @@
         await makeApiCall(`/admin/requests/${emailEnc}/reject`, 'POST');
         showSuccess('Rejected'); loadApprovals();
       } catch {}
+    }
+
+    async function checkFeesPdf() {
+      try {
+        const res = await fetch(`${API_BASE}/fees-structure`);
+        if (!res.ok) throw new Error('Status fetch failed');
+        const data = await res.json();
+        const statusEl = document.getElementById('feesPdfStatus');
+        const dlLink = document.getElementById('feesPdfDownloadAdmin');
+        if (data.available) {
+          const sizeKB = (data.size / 1024).toFixed(1);
+          const updated = data.updatedAt ? new Date(data.updatedAt).toLocaleString() : 'Unknown';
+          statusEl.textContent = `Uploaded: ${sizeKB} KB • Updated ${updated}`;
+          dlLink.href = '/uploads/fees-structure.pdf';
+          dlLink.style.display = 'inline-block';
+        } else {
+          statusEl.textContent = 'No file uploaded yet.';
+          dlLink.style.display = 'none';
+        }
+      } catch (e) {
+        console.error(e);
+        const statusEl = document.getElementById('feesPdfStatus');
+        if (statusEl) statusEl.textContent = 'Unable to load status.';
+      }
+    }
+
+    async function uploadFeesPdf() {
+      const input = document.getElementById('feesPdfInput');
+      if (!input || !input.files || !input.files.length) {
+        alert('Select a PDF first');
+        return;
+      }
+      const file = input.files[0];
+      if (file.type !== 'application/pdf') { alert('File must be a PDF'); return; }
+      if (file.size > 4 * 1024 * 1024) { alert('PDF exceeds 4MB limit'); return; }
+      const fd = new FormData(); fd.append('feesPdf', file);
+      try {
+        const token = localStorage.getItem('admin_token');
+        const headers = { 'Authorization': `Bearer ${token || ''}` };
+        // CSRF token from cookie
+        try {
+          const cookieVal = (document.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+          if (cookieVal) {
+            const csrf = decodeURIComponent(cookieVal.split('=')[1]);
+            if (csrf) headers['x-csrf-token'] = csrf;
+          }
+        } catch {}
+        const res = await fetch(`${API_BASE}/admin/fees-structure`, { method: 'POST', headers, body: fd, credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.error || 'Upload failed');
+          return;
+        }
+        showSuccess('Fees structure uploaded');
+        input.value = '';
+        await checkFeesPdf();
+      } catch (e) {
+        console.error(e);
+        alert('Network error uploading PDF');
+      }
     }
   </script>
 </head>
@@ -1243,6 +1338,18 @@
         <div style="text-align:right;"><button class="btn primary" type="submit"> Save Settings</button></div>
       </form>
       <div class="small">These values control the public site header and footer.</div>
+      <hr style="margin:24px 0; border:none; border-top:1px solid #e2e8f0;">
+      <div class="section-title" style="margin-top:0;">Fees Structure PDF</div>
+      <div class="form-group" style="max-width:420px;">
+        <label class="small" for="feesPdfInput">Upload / Replace Fees Structure (PDF only, max 4MB)</label>
+        <input id="feesPdfInput" type="file" accept="application/pdf" class="form-input">
+        <div id="feesPdfStatus" class="small" style="margin-top:6px;color:#64748b;">No file uploaded yet.</div>
+        <div style="margin-top:10px; display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="btn primary" type="button" onclick="uploadFeesPdf()">Upload PDF</button>
+          <button class="btn" type="button" onclick="checkFeesPdf()">Refresh Status</button>
+          <a id="feesPdfDownloadAdmin" href="#" target="_blank" style="display:none;" class="btn">Download Current</a>
+        </div>
+      </div>
     </div>
 
     <!-- Route Editor Modal -->

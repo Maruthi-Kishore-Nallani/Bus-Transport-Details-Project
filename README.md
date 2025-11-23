@@ -37,6 +37,7 @@ Open `page.html` (user) and `admin.html` (admin login). New admins can request a
 - Admin: POST `/api/admin/login`, GET `/api/admin/me`, GET `/api/admin/logs`
 - Settings: GET `/api/settings`, PUT `/api/admin/settings`
 - Admin approvals: POST `/api/admin/signup-request`, GET `/api/admin/requests`, POST `/api/admin/requests/:email/(approve|reject)`
+- Fees Structure: GET `/api/fees-structure`, POST `/api/admin/fees-structure` (admin only)
 
 ## Notes
 - Requires a valid Google Maps API key for geocoding/reverse-geocoding.
@@ -109,10 +110,11 @@ Open `page.html` (user) and `admin.html` (admin login). New admins can request a
 - [ ] Use Prisma client methods instead of raw SQL where possible
 
 #### 11. File Uploads
-- [ ] Validate file types and sizes (already implemented)
+- [ ] Validate file types and sizes (already implemented for images and PDFs)
 - [ ] Store uploads outside web root or serve via CDN
 - [ ] Scan uploads for malware if accepting from untrusted sources
 - [ ] Set proper file permissions on `uploads/` directory
+- [ ] Fees structure PDF limited to 4MB and admin-only upload
 
 #### 12. Dependencies
 - [ ] Run `npm audit` regularly

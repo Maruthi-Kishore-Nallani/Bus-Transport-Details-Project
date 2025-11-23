@@ -102,6 +102,7 @@ CORS_ORIGIN=http://localhost:3000,https://yourdomain.com
 - [ ] Run `npm audit`
 - [ ] Set up error monitoring
 - [ ] Configure database backups
+- [ ] Ensure `uploads/` directory is writable for PDF uploads
 
 ## Security Resources
 

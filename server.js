@@ -75,7 +75,23 @@ const prisma = new PrismaClient();
 
 // Create HTTP server and attach socket.io for live updates
 const httpServer = http.createServer(app);
-const io = new IOServer(httpServer, { cors: { origin: '*' } });
+// Allow configuring socket.io CORS origins from env (comma-separated)
+const ioCorsOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : ['http://localhost:3000'];
+const io = new IOServer(httpServer, {
+  cors: {
+    origin: (origin, callback) => {
+      // Allow requests without origin (mobile apps, curl)
+      if (!origin) return callback(null, true);
+      if (ioCorsOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+  },
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 30000
+});
 
 io.on('connection', (socket) => {
   logger.debug('Socket connected', { socketId: socket.id });
@@ -285,6 +301,18 @@ const upload = multer({
     cb(null, true);
   }
 });
+// Dedicated PDF upload handler for fees structure (separate to keep strict MIME)
+const pdfUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => cb(null, `${Date.now()}_fees_tmp.pdf`)
+  }),
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB PDF limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') return cb(new Error('Only PDF allowed'));
+    cb(null, true);
+  }
+});
 // ---- Simple settings storage (JSON file) ----
 const SETTINGS_PATH = path.join(__dirname, 'settings.json');
 const DEFAULT_SETTINGS = {
@@ -354,6 +382,118 @@ const DEFAULT_RADIUS_KM = parseFloat(process.env.SEARCH_RADIUS_KM) || 1.5; // ST
 const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_API_KEY || null;
 const geocodeCache = new Map();
 const reverseGeocodeCache = new Map();
+// Route polylines cache: in-memory Map and on-disk JSON persistence
+const os = require('os');
+const PERSIST_ROUTE_CACHE = (process.env.ROUTE_CACHE_PERSIST === 'true') || (process.env.NODE_ENV === 'production');
+const ROUTE_CACHE_PATH = PERSIST_ROUTE_CACHE ? path.join(__dirname, 'route_cache.json') : path.join(os.tmpdir(), `route_cache_${process.pid}.json`);
+const routePolylinesCache = new Map(); // key: busId (number) -> { morningRoute: [...], eveningRoute: [...] }
+
+function loadRouteCacheFromDisk() {
+  try {
+    if (fs.existsSync(ROUTE_CACHE_PATH)) {
+      const raw = fs.readFileSync(ROUTE_CACHE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      for (const key of Object.keys(parsed || {})) {
+        routePolylinesCache.set(Number(key), parsed[key]);
+      }
+      logger.info('Loaded route polylines cache from disk', { count: routePolylinesCache.size });
+    }
+  } catch (e) {
+    logger.warn('Failed to load route cache from disk', { error: e && e.message });
+  }
+}
+
+function saveRouteCacheToDisk() {
+  try {
+    const obj = {};
+    for (const [k, v] of routePolylinesCache.entries()) obj[String(k)] = v;
+    fs.writeFileSync(ROUTE_CACHE_PATH, JSON.stringify(obj, null, 2), 'utf-8');
+    logger.info('Saved route polylines cache to disk', { count: routePolylinesCache.size, path: ROUTE_CACHE_PATH, persisted: PERSIST_ROUTE_CACHE });
+  } catch (e) {
+    logger.warn('Failed to persist route cache to disk', { error: e && e.message });
+  }
+}
+
+async function buildRouteForBus(b) {
+  // b: bus record including stops
+  const morningStops = (b.stops || []).filter(s => s.period === 'MORNING').sort((x, y) => x.order - y.order);
+  const eveningStops = (b.stops || []).filter(s => s.period === 'EVENING').sort((x, y) => x.order - y.order);
+
+  const buildForStops = async (stopsArr) => {
+    if (!stopsArr || stopsArr.length === 0) return [];
+    if (stopsArr.length === 1) return [{ lat: stopsArr[0].lat, lng: stopsArr[0].lng }];
+    const origin = { lat: stopsArr[0].lat, lng: stopsArr[0].lng };
+    const destination = { lat: stopsArr[stopsArr.length - 1].lat, lng: stopsArr[stopsArr.length - 1].lng };
+    const waypoints = stopsArr.slice(1, -1).map(s => ({ lat: s.lat, lng: s.lng }));
+    try {
+      const path = await getRoutePath(origin, destination, waypoints);
+      return path;
+    } catch (e) {
+      // fallback to straight-line points
+      return stopsArr.map(s => ({ lat: s.lat, lng: s.lng }));
+    }
+  };
+
+  const morningRoute = await buildForStops(morningStops);
+  const eveningRoute = await buildForStops(eveningStops);
+  return { morningRoute, eveningRoute };
+}
+
+async function buildAllRoutePolylines() {
+  try {
+    logger.info('Building all route polylines (may use Google Directions API)');
+    const buses = await prisma.bus.findMany({ include: { stops: true } });
+    for (const b of buses) {
+      try {
+        const routes = await buildRouteForBus(b);
+        routePolylinesCache.set(b.id, routes);
+      } catch (e) {
+        logger.warn('Failed building route for bus', { busId: b.id, error: e && e.message });
+      }
+    }
+    saveRouteCacheToDisk();
+    logger.info('Finished building route polylines', { cached: routePolylinesCache.size });
+  } catch (e) {
+    logger.error('Failed to build all route polylines', { error: e && e.message });
+  }
+}
+
+// Load persisted cache on startup (non-blocking)
+loadRouteCacheFromDisk();
+// Schedule-controlled background refresh to ensure up-to-date routes when server starts
+// Avoid running an immediate, synchronous rebuild which can trigger repeated
+// work during dev when files are being written and nodemon watches the tree.
+const ROUTE_BUILD_COOLDOWN_MS = parseInt(process.env.ROUTE_BUILD_COOLDOWN_MS || '300000', 10); // default 5 minutes
+let _lastRouteBuildTs = 0;
+let _routeRebuildTimer = null;
+
+function scheduleRouteCacheRebuild(immediate = false) {
+  try {
+    if (_routeRebuildTimer) {
+      clearTimeout(_routeRebuildTimer);
+      _routeRebuildTimer = null;
+    }
+    const now = Date.now();
+    const since = now - _lastRouteBuildTs;
+    const delay = immediate ? 0 : Math.max(0, ROUTE_BUILD_COOLDOWN_MS - since);
+    _routeRebuildTimer = setTimeout(async () => {
+      _routeRebuildTimer = null;
+      _lastRouteBuildTs = Date.now();
+      try {
+        logger.info('Scheduled: starting route polylines build');
+        await buildAllRoutePolylines();
+      } catch (e) {
+        logger.warn('Scheduled route build failed', { error: e && e.message });
+      }
+    }, delay);
+    logger.debug('Route cache rebuild scheduled', { immediate, delay });
+  } catch (e) {
+    logger.warn('Failed to schedule route cache rebuild', { error: e && e.message });
+  }
+}
+
+// Perform a single startup rebuild but via scheduler to avoid immediate re-entrancy.
+scheduleRouteCacheRebuild(false);
 
 /**
  * STEP 2: Geocode a place name -> { lat, lng, formatted_address }
@@ -366,8 +506,9 @@ async function geocodeLocation(locationName) {
   const key = locationName.trim().toLowerCase();
   if (geocodeCache.has(key)) return geocodeCache.get(key);
 
+  // If no Google Maps key is configured, fall back to Nominatim (OpenStreetMap)
   if (!GOOGLE_MAPS_KEY) {
-    throw new Error('Google Maps API key not configured');
+    return nominatimGeocode(locationName);
   }
 
   // Enforce daily usage limit for Google API calls
@@ -375,12 +516,29 @@ async function geocodeLocation(locationName) {
     throw new Error('Google Maps daily usage limit exceeded');
   }
 
-  const q = encodeURIComponent(locationName);
+  // Preprocess: If a state (administrative area) env is provided and not already in the query, append it
+  const statePref = process.env.GEOCODE_STATE || '';
+  const cityPref = process.env.GEOCODE_CITY || '';
+  let queryAugmented = locationName.trim();
+  if (statePref && !new RegExp(statePref.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&'), 'i').test(queryAugmented)) {
+    queryAugmented += `, ${statePref}`;
+  }
+  if (cityPref && !new RegExp(cityPref.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&'), 'i').test(queryAugmented) && /market|station|bus|stand|center|centre|college/i.test(queryAugmented)) {
+    // If query looks like a POI and city isn't present, append city
+    queryAugmented += `, ${cityPref}`;
+  }
+
+  const q = encodeURIComponent(queryAugmented);
   const country = process.env.GEOCODE_COUNTRY || '';
   const region = process.env.GEOCODE_REGION || '';
+  const components = [];
+  if (country) components.push(`country:${country}`);
+  // If statePref provided, include administrative_area component filter (Google supports 'administrative_area')
+  if (statePref) components.push(`administrative_area:${encodeURIComponent(statePref)}`);
+  if (cityPref) components.push(`locality:${encodeURIComponent(cityPref)}`);
   let url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=${GOOGLE_MAPS_KEY}`;
-  if (country) url += `&components=country:${country}`;
-  if (region) url += `&region=${region}`;
+  if (components.length) url += `&components=${components.join('|')}`;
+  if (region) url += `&region=${region}`; // region bias (ccTLD style)
 
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
@@ -389,17 +547,75 @@ async function geocodeLocation(locationName) {
       res.on('end', () => {
         try {
           const j = JSON.parse(body);
-          if (j.status === 'OK' && j.results && j.results[0]) {
-            const loc = j.results[0].geometry.location;
-            const out = { lat: loc.lat, lng: loc.lng, formatted_address: j.results[0].formatted_address };
+          if (j.status === 'OK' && Array.isArray(j.results) && j.results.length) {
+            const stateNorm = statePref ? statePref.toLowerCase() : '';
+            const cityNorm = cityPref ? cityPref.toLowerCase() : '';
+            // Prefer result whose address components match desired state & city if provided
+            let chosen = null;
+            for (const r of j.results) {
+              const comps = Array.isArray(r.address_components) ? r.address_components : [];
+              const compNames = comps.map(c => c.long_name.toLowerCase());
+              const compTypes = comps.map(c => c.types).flat();
+              const hasState = stateNorm && compNames.includes(stateNorm);
+              const hasCity = cityNorm && compNames.includes(cityNorm);
+              // Prioritize: both state + city > state only > city only > first result
+              if (!chosen || (stateNorm && cityNorm && hasState && hasCity) || (stateNorm && hasState && !cityNorm) || (cityNorm && hasCity && !stateNorm)) {
+                // If both required, ensure this one matches both before selecting definitively
+                if (stateNorm && cityNorm) {
+                  if (hasState && hasCity) { chosen = r; break; }
+                } else if (stateNorm && hasState) { chosen = r; break; }
+                else if (cityNorm && hasCity) { chosen = r; break; }
+                else if (!stateNorm && !cityNorm && !chosen) { chosen = r; }
+                else if (!chosen) { chosen = r; }
+              }
+            }
+            if (!chosen) chosen = j.results[0];
+            const loc = chosen.geometry.location;
+            const out = { lat: loc.lat, lng: loc.lng, formatted_address: chosen.formatted_address };
             geocodeCache.set(key, out);
-            resolve(out);
-          } else {
-            reject(new Error(`Geocode failed: ${j.status || 'NO_RESULTS'}`));
+            return resolve(out);
           }
+          // If Google didn't return results, try Nominatim as a fallback
+          return nominatimGeocode(locationName).then((resGeo) => {
+            if (resGeo) return resolve(resGeo);
+            return reject(new Error(`Geocode failed: ${j.status || 'NO_RESULTS'}`));
+          }).catch(() => reject(new Error(`Geocode failed: ${j.status || 'NO_RESULTS'}`)));
         } catch (err) { reject(err); }
       });
     }).on('error', reject);
+  });
+}
+
+// Google Places helper removed: we rely on `geocodeLocation` (regional-first) and Nominatim fallback.
+
+/**
+ * Nominatim (OpenStreetMap) geocoding fallback
+ * Returns { lat, lng, formatted_address } or throws
+ */
+function nominatimGeocode(locationName) {
+  return new Promise((resolve, reject) => {
+    try {
+      const q = encodeURIComponent(locationName);
+      const nomUrl = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`;
+      const opts = new URL(nomUrl);
+      const reqOpts = { hostname: opts.hostname, path: opts.pathname + opts.search, method: 'GET', headers: { 'User-Agent': 'BusTransportApp/1.0' } };
+      https.get(reqOpts, (res) => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => {
+          try {
+            const arr = JSON.parse(body);
+            if (Array.isArray(arr) && arr.length > 0) {
+              const first = arr[0];
+              const out = { lat: parseFloat(first.lat), lng: parseFloat(first.lon), formatted_address: first.display_name };
+              geocodeCache.set(locationName.trim().toLowerCase(), out);
+              return resolve(out);
+            }
+            return resolve(null);
+          } catch (e) { return reject(e); }
+        });
+      }).on('error', (e) => reject(e));
+    } catch (e) { reject(e); }
   });
 }
 
@@ -436,6 +652,18 @@ app.post('/api/reverse-geocode', async (req, res) => {
   }
 });
 
+// Dev-only: return Google Maps API key to client for local development
+app.get('/api/maps-key', (req, res) => {
+  try {
+    // Only allow in non-production to avoid leaking keys from deployed sites
+    if (process.env.NODE_ENV === 'production') return res.status(403).json({ success: false, message: 'Not allowed' });
+    if (!GOOGLE_MAPS_KEY) return res.status(404).json({ success: false, message: 'No key configured' });
+    return res.json({ success: true, key: GOOGLE_MAPS_KEY });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 
 /**
  * Reverse geocode coordinates -> place name (formatted address)
@@ -444,7 +672,20 @@ app.post('/api/reverse-geocode', async (req, res) => {
 async function reverseGeocode(lat, lng) {
   const key = `${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
   if (reverseGeocodeCache.has(key)) return reverseGeocodeCache.get(key);
-  if (!GOOGLE_MAPS_KEY) throw new Error('Google Maps API key not configured');
+
+  // If no Google Maps key is configured, fall back to Nominatim reverse geocoding
+  if (!GOOGLE_MAPS_KEY) {
+    try {
+      const addr = await nominatimReverse(lat, lng);
+      if (addr) {
+        reverseGeocodeCache.set(key, addr);
+        return addr;
+      }
+    } catch (e) {
+      // ignore and fall through to error below
+    }
+    throw new Error('Google Maps API key not configured');
+  }
 
   if (!checkAndIncrementGoogleUsage()) throw new Error('Google Maps daily usage limit exceeded');
   const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(`${lat},${lng}`)}&key=${GOOGLE_MAPS_KEY}`;
@@ -466,6 +707,70 @@ async function reverseGeocode(lat, lng) {
       });
     }).on('error', () => resolve(null));
   });
+}
+
+// Nominatim reverse geocode fallback
+function nominatimReverse(lat, lng) {
+  return new Promise((resolve, reject) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json`;
+      https.get(url, { headers: { 'User-Agent': 'BusTransportApp/1.0' } }, (res) => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(body);
+            if (j && j.display_name) return resolve(j.display_name);
+            return resolve(null);
+          } catch (e) { return reject(e); }
+        });
+      }).on('error', reject);
+    } catch (e) { reject(e); }
+  });
+}
+
+/**
+ * Geocode by lat,lng -> { formatted_address, lat, lng }
+ * Uses Google Geocoding API when key is available, else falls back to Nominatim
+ */
+async function geocodeLatLng(lat, lng) {
+  const nLat = Number(lat); const nLng = Number(lng);
+  if (Number.isNaN(nLat) || Number.isNaN(nLng)) throw new Error('Invalid lat/lng');
+
+  // Prefer Google Geocoding when key present
+  if (GOOGLE_MAPS_KEY) {
+    if (!checkAndIncrementGoogleUsage()) throw new Error('Google Maps daily usage limit exceeded');
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(`${nLat},${nLng}`)}&key=${GOOGLE_MAPS_KEY}`;
+    return new Promise((resolve, reject) => {
+      https.get(url, (res) => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(body);
+            if (j.status === 'OK' && j.results && j.results[0]) {
+              const r = j.results[0];
+              const loc = r.geometry && r.geometry.location ? r.geometry.location : { lat: nLat, lng: nLng };
+              return resolve({ formatted_address: r.formatted_address || `${nLat}, ${nLng}`, lat: loc.lat, lng: loc.lng });
+            }
+            // fallback to nominatim
+            return nominatimReverse(nLat, nLng).then(addr => resolve({ formatted_address: addr || `${nLat}, ${nLng}`, lat: nLat, lng: nLng })).catch(() => resolve({ formatted_address: `${nLat}, ${nLng}`, lat: nLat, lng: nLng }));
+          } catch (e) { return reject(e); }
+        });
+      }).on('error', (e) => {
+        // fallback
+        nominatimReverse(nLat, nLng).then(addr => resolve({ formatted_address: addr || `${nLat}, ${nLng}`, lat: nLat, lng: nLng })).catch(() => resolve({ formatted_address: `${nLat}, ${nLng}`, lat: nLat, lng: nLng }));
+      });
+    });
+  }
+
+  // No Google key: use Nominatim reverse and return lat/lng as provided
+  try {
+    const addr = await nominatimReverse(nLat, nLng);
+    return { formatted_address: addr || `${nLat}, ${nLng}`, lat: nLat, lng: nLng };
+  } catch (e) {
+    return { formatted_address: `${nLat}, ${nLng}`, lat: nLat, lng: nLng };
+  }
 }
 
 /**
@@ -571,22 +876,111 @@ async function getRoutePath(origin, destination, waypoints = []) {
 function isPathIntersectsCircle(userLocation, path, radiusMeters) {
   if (!path || path.length === 0) return false;
   const center = { latitude: userLocation.lat, longitude: userLocation.lng };
-
   // Check if ANY mini point is inside circle -> intersects
-  for (const p of path) {
-    const d = getDistance({ latitude: p.lat, longitude: p.lng }, center);
-    if (d <= radiusMeters) return true;
+  // Use per-point distance checks only (matches requested algorithm).
+  // This avoids any discrepancies from segment-distance helper implementations.
+  let minDist = Infinity;
+  let minIndex = -1;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i];
+    const lat = Number(p.lat);
+    const lng = Number(p.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) continue;
+    const d = getDistance({ latitude: lat, longitude: lng }, center);
+    if (d < minDist) { minDist = d; minIndex = i; }
+    if (d <= radiusMeters) {
+      logger.debug('Path intersects circle by point', { index: i, distanceMeters: d, radiusMeters });
+      return true;
+    }
   }
 
-  // Check each segment between mini points crosses the circle
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = { latitude: path[i].lat, longitude: path[i].lng };
-    const b = { latitude: path[i + 1].lat, longitude: path[i + 1].lng };
-    const distToSegment = getDistanceFromLine(center, a, b); // meters
-    if (distToSegment <= radiusMeters) return true;
-  }
-
+  // If no point was within the radius, return false (no intersection)
+  logger.debug('Path did not intersect (point-only check)', { minDist, minIndex, radiusMeters });
   return false;
+}
+
+// Helper: compute minimum distance (meters) from userLocation to any point in path
+function getMinDistanceAlongPath(userLocation, path) {
+  const center = { latitude: userLocation.lat, longitude: userLocation.lng };
+  let minDist = Infinity;
+  let minIndex = -1;
+  if (!Array.isArray(path) || path.length === 0) return { minDist, minIndex };
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i];
+    const lat = Number(p.lat);
+    const lng = Number(p.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) continue;
+    const d = getDistance({ latitude: lat, longitude: lng }, center);
+    if (d < minDist) { minDist = d; minIndex = i; }
+  }
+  return { minDist, minIndex };
+}
+
+// --- Geodesy helpers (self-contained) ---
+function toRad(deg) { return deg * Math.PI / 180; }
+function toDeg(rad) { return rad * 180 / Math.PI; }
+
+// Great-circle distance (Haversine) in meters
+function haversineDistance(a, b) {
+  const R = 6371000; // Earth radius meters
+  const lat1 = toRad(a.latitude); const lat2 = toRad(b.latitude);
+  const dLat = lat2 - lat1; const dLon = toRad(b.longitude - a.longitude);
+  const sinDlat = Math.sin(dLat / 2);
+  const sinDlon = Math.sin(dLon / 2);
+  const aa = sinDlat * sinDlat + Math.cos(lat1) * Math.cos(lat2) * sinDlon * sinDlon;
+  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+  return R * c;
+}
+
+// Initial bearing from a -> b in radians
+function bearingRad(a, b) {
+  const lat1 = toRad(a.latitude); const lat2 = toRad(b.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return Math.atan2(y, x);
+}
+
+// Cross-track distance from point c to great-circle path a->b (meters)
+function crossTrackDistanceMeters(a, b, c) {
+  const R = 6371000;
+  const d13 = haversineDistance(a, c) / R; // angular distance
+  const theta13 = bearingRad(a, c);
+  const theta12 = bearingRad(a, b);
+  const xt = Math.asin(Math.sin(d13) * Math.sin(theta13 - theta12));
+  return Math.abs(xt * R);
+}
+
+// Compute the along-track distance from a to closest point to c on a->b (meters)
+function alongTrackDistanceMeters(a, b, c) {
+  const R = 6371000;
+  const d13 = haversineDistance(a, c) / R;
+  const theta13 = bearingRad(a, c);
+  const theta12 = bearingRad(a, b);
+  const at = Math.acos(Math.cos(d13) / Math.cos(Math.asin(Math.sin(d13) * Math.sin(theta13 - theta12))));
+  return at * R;
+}
+
+// Distance from point c to segment a-b (meters). Uses cross-track when projection lies on segment,
+// otherwise returns min(distance to endpoints).
+function pointToSegmentDistanceMeters(a, b, c) {
+  try {
+    const A = { latitude: a.lat || a.latitude, longitude: a.lng || a.longitude };
+    const B = { latitude: b.lat || b.latitude, longitude: b.lng || b.longitude };
+    const C = { latitude: c.lat || c.latitude, longitude: c.lng || c.longitude };
+
+    const distAB = haversineDistance(A, B);
+    if (distAB === 0) return haversineDistance(A, C);
+
+    const at = alongTrackDistanceMeters(A, B, C);
+    if (at < 0) return haversineDistance(A, C);
+    if (at > distAB) return haversineDistance(B, C);
+
+    // projection lies on segment -> use cross-track
+    return crossTrackDistanceMeters(A, B, C);
+  } catch (e) {
+    return Infinity;
+  }
 }
 
 /**
@@ -641,37 +1035,43 @@ function isPathIntersectsCircle(userLocation, path, radiusMeters) {
         return result;
       }
 
-      // Multiple stops: Generate route path using Google Directions or straight-line
-      const origin = { lat: stopsArr[0].lat, lng: stopsArr[0].lng };
-      const destination = { lat: stopsArr[stopsArr.length - 1].lat, lng: stopsArr[stopsArr.length - 1].lng };
-      const waypoints = stopsArr.slice(1, -1).map(s => ({ lat: s.lat, lng: s.lng }));
-
-             let path;
-       try {
-         // Generate FULL ROUTE as array of mini points (not just bus stops!)
-         // This includes hundreds of points along the actual road path
-         path = await getRoutePath(origin, destination, waypoints);
-       } catch (e) {
-         // Fallback to straight-line connections between stops only
-         path = stopsArr.map(s => ({ lat: s.lat, lng: s.lng }));
-       }
+      // Multiple stops: Prefer using precomputed route polyline cache to avoid
+      // making Directions API calls per-request. Fall back to generating path.
+      let path = [];
+      try {
+        const cached = routePolylinesCache.get(b.id);
+        if (cached && cached[routeType === 'MORNING' ? 'morningRoute' : 'eveningRoute'] && cached[routeType === 'MORNING' ? 'morningRoute' : 'eveningRoute'].length > 0) {
+          path = cached[routeType === 'MORNING' ? 'morningRoute' : 'eveningRoute'];
+        } else {
+          const origin = { lat: stopsArr[0].lat, lng: stopsArr[0].lng };
+          const destination = { lat: stopsArr[stopsArr.length - 1].lat, lng: stopsArr[stopsArr.length - 1].lng };
+          const waypoints = stopsArr.slice(1, -1).map(s => ({ lat: s.lat, lng: s.lng }));
+          path = await getRoutePath(origin, destination, waypoints);
+        }
+      } catch (e) {
+        // Fallback to straight-line connections between stops only
+        path = stopsArr.map(s => ({ lat: s.lat, lng: s.lng }));
+      }
 
       // Store the FULL ROUTE path (hundreds of mini points) for reference
       result.routePath = path;
 
-             // Check if the FULL ROUTE (all mini points + segments) intersects the circle
-       if (isPathIntersectsCircle(userLocation, path, radiusMeters)) {
-         result.intersects = true;
-         
-         // Count actual bus stops within the circle for reporting
-         result.stopCount = stopsArr.reduce((acc, s) => {
-           const d = getDistance(
-             { latitude: userLocation.lat, longitude: userLocation.lng },
-             { latitude: s.lat, longitude: s.lng }
-           );
-           return acc + (d <= radiusMeters ? 1 : 0);
-         }, 0);
-       }
+      // Compute minimum distance from user location to any point on the path
+      const { minDist, minIndex } = getMinDistanceAlongPath(userLocation, path);
+      logger.debug('Route diagnostic', { busId: b.id, busNumber: b.number, routeType, pathLength: (path && path.length) || 0, minDist, minIndex, radiusMeters });
+
+      if (typeof minDist === 'number' && minDist <= radiusMeters) {
+        result.intersects = true;
+        // Count actual bus stops within the circle for reporting
+        result.stopCount = stopsArr.reduce((acc, s) => {
+          const d = getDistance(
+            { latitude: userLocation.lat, longitude: userLocation.lng },
+            { latitude: s.lat, longitude: s.lng }
+          );
+          return acc + (d <= radiusMeters ? 1 : 0);
+        }, 0);
+        logger.info('Route marked as intersecting by point-distance', { busNumber: b.number, routeType, minDist, minIndex, radiusMeters });
+      }
 
       return result;
     }
@@ -759,10 +1159,20 @@ app.post('/api/admin/login', async (req, res) => {
     const now = Date.now();
     const rec = loginAttempts.get(ip) || { count: 0, firstTs: now };
     if (now - rec.firstTs > LOGIN_WINDOW_MS) { rec.count = 0; rec.firstTs = now; }
+    // Increment count for this attempt
     rec.count += 1;
     loginAttempts.set(ip, rec);
     if (rec.count > LOGIN_MAX_ATTEMPTS) {
-      return res.status(429).json({ success: false, message: 'Too many login attempts. Try again later.' });
+      const retryMs = (rec.firstTs + LOGIN_WINDOW_MS) - now;
+      return res.status(429).json({ 
+        success: false, 
+        message: 'Too many login attempts. Try again later.',
+        attemptsUsed: rec.count - 1, // prior successful attempts within window
+        maxAttempts: LOGIN_MAX_ATTEMPTS,
+        attemptsRemaining: 0,
+        windowMs: LOGIN_WINDOW_MS,
+        retryAfterSeconds: retryMs > 0 ? Math.ceil(retryMs / 1000) : 0
+      });
     }
 
     const { email, password } = req.body;
@@ -945,36 +1355,19 @@ app.get('/api/admin/logs', requireAdmin, async (req, res) => {
     // SECURITY NOTE: This query is safe - no user input, constructed from validated column names
     const logs = await prisma.$queryRawUnsafe(selectQuery);
 
-    // Enrich with place name if coordinates are available
-    const enriched = await Promise.all(logs.map(async (log) => {
-      let locationName = null;
+    // Return logs using the stored unified `location` value so admin always sees
+    // the exact formatted label saved at submission time.
+    // Parse 'requested' flag but skip server-side enrichment to improve performance.
+    // Client-side enrichment was removed earlier; coordinate-only entries display as-is.
+    const enriched = logs.map((log) => {
       let requested = false;
       let rawLocation = log.location;
-
-      // Detect our request flag prefix and strip it for display
       if (typeof rawLocation === 'string' && rawLocation.startsWith('__REQ__YES__||')) {
         requested = true;
         rawLocation = rawLocation.replace('__REQ__YES__||', '');
       }
-
-      if (typeof log.lat === 'number' && typeof log.lng === 'number') {
-        try {
-          locationName = await reverseGeocode(log.lat, log.lng);
-        } catch (e) {
-          locationName = null;
-        }
-      } else if (typeof rawLocation === 'string') {
-        // If only a string was provided, try parsing coords "lat,lng"
-        const m = rawLocation.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
-        if (m) {
-          const lat = parseFloat(m[1]); const lng = parseFloat(m[2]);
-          if (!isNaN(lat) && !isNaN(lng)) {
-            try { locationName = await reverseGeocode(lat, lng); } catch {}
-          }
-        }
-      }
-      return { ...log, locationName, requested, location: rawLocation };
-    }));
+      return { ...log, requested, location: rawLocation };
+    });
 
     res.json({ success: true, logs: enriched });
   } catch (e) {
@@ -1036,6 +1429,9 @@ app.post('/api/admin/buses', requireAdmin, requireCsrf, async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to add bus' });
   }
 });
+
+// After adding a bus, schedule a route cache rebuild (debounced)
+try { scheduleRouteCacheRebuild(false); } catch (e) { /* ignore */ }
 
 // Get all buses (admin only)
 app.get('/api/admin/buses', requireAdmin, async (req, res) => {
@@ -1145,6 +1541,9 @@ app.put('/api/admin/buses/:busNumber', requireAdmin, requireCsrf, async (req, re
   }
 });
 
+// After updating a bus, schedule a route cache rebuild (debounced)
+try { scheduleRouteCacheRebuild(false); } catch (e) { /* ignore */ }
+
 // Delete bus (admin only)
 app.delete('/api/admin/buses/:busNumber', requireAdmin, requireCsrf, async (req, res) => {
   try {
@@ -1167,6 +1566,9 @@ app.delete('/api/admin/buses/:busNumber', requireAdmin, requireCsrf, async (req,
     res.status(500).json({ success: false, message: 'Failed to delete bus' });
   }
 });
+
+// After deleting a bus, schedule a route cache rebuild (debounced)
+try { scheduleRouteCacheRebuild(false); } catch (e) { /* ignore */ }
 
 // Upload or replace bus image (admin only)
 app.post('/api/admin/buses/:busNumber/photo', requireAdmin, requireCsrf, upload.single('photo'), async (req, res) => {
@@ -1234,6 +1636,36 @@ app.post('/api/admin/buses/:busNumber/photo', requireAdmin, requireCsrf, upload.
   }
 });
 
+// Admin: upload/update fees structure PDF (stored as /uploads/fees-structure.pdf)
+app.post('/api/admin/fees-structure', requireAdmin, requireCsrf, pdfUpload.single('feesPdf'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ success: false, message: 'No PDF uploaded' });
+    const targetName = 'fees-structure.pdf';
+    const targetPath = path.join(UPLOADS_DIR, targetName);
+    // Replace existing file if present
+    try { if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath); } catch (e) { /* ignore */ }
+    try { fs.renameSync(path.join(UPLOADS_DIR, file.filename), targetPath); } catch (e) {
+      return res.status(500).json({ success: false, message: 'Failed storing PDF' });
+    }
+    return res.json({ success: true, url: `/uploads/${targetName}` });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message || 'Upload failed' });
+  }
+});
+
+// Public: check fees structure availability
+app.get('/api/fees-structure', (req, res) => {
+  try {
+    const targetPath = path.join(UPLOADS_DIR, 'fees-structure.pdf');
+    if (!fs.existsSync(targetPath)) return res.json({ success: false, available: false });
+    const stat = fs.statSync(targetPath);
+    return res.json({ success: true, available: true, size: stat.size, url: '/uploads/fees-structure.pdf', updatedAt: stat.mtime.toISOString() });
+  } catch (e) {
+    return res.status(500).json({ success: false, available: false });
+  }
+});
+
 // API Routes
 
 // Health check
@@ -1284,6 +1716,8 @@ app.post('/api/check-availability', async (req, res) => {
     console.log(`📍 Input location: ${location}`);
     
     let userLocation;
+    // We'll also derive a human-friendly formattedName like: "Place Name (lat, lng)"
+    let formattedName = null;
     if (typeof location === 'string') {
       // Check if it's coordinates (lat,lng format) - handle with or without spaces
       const coordMatch = location.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
@@ -1298,23 +1732,69 @@ app.post('/api/check-availability', async (req, res) => {
         }
         userLocation = { lat, lng };
         console.log(`✅ Using coordinates directly: ${lat},${lng}`);
-      } else {
-        // STEP 2: It's a location name, geocode it
-        console.log(`🔍 Geocoding location name: "${location}"...`);
+
+        // Attempt to derive a nearby place name via reverse geocoding so the stored name
+        // looks like it was obtained from the current location (user expectation).
+        // Use geocodeLatLng which returns a stable `{ formatted_address, lat, lng }`
+        // and falls back to Nominatim when Google isn't available.
         try {
-          const geocodedLocation = await geocodeLocation(location);
-          userLocation = { lat: geocodedLocation.lat, lng: geocodedLocation.lng };
-          console.log(`✅ Geocoded to: ${userLocation.lat},${userLocation.lng}`);
-          console.log(`   Address: ${geocodedLocation.formatted_address}`);
-        } catch (error) {
-          return res.status(400).json({
-            success: false,
-            message: `Could not find location "${location}". Please provide coordinates as "lat,lng" or a valid location name.`
-          });
+          const geo = await geocodeLatLng(lat, lng);
+          if (geo && geo.formatted_address) {
+            formattedName = `${geo.formatted_address} (${Number(geo.lat).toFixed(6)}, ${Number(geo.lng).toFixed(6)})`;
+            // also update userLocation to any adjusted coords returned by the geocoder
+            userLocation = { lat: Number(geo.lat), lng: Number(geo.lng) };
+          }
+        } catch (e) {
+          // ignore, we'll fall back to raw coords below
+        }
+
+      } else {
+        // STEP 2: It's a location name — prefer a regional geocode first (uses GEOCODE_COUNTRY/GEOCODE_REGION),
+        // then fall back to Places API, then global geocoding/Nominatim.
+        console.log(`🔍 Resolving place name: "${location}" using regional-first strategy...`);
+
+        // 1) Try geocodeLocation (this function already considers GEOCODE_COUNTRY/GEOCODE_REGION)
+        try {
+          const regionalGeo = await geocodeLocation(location);
+          if (regionalGeo && typeof regionalGeo.lat === 'number' && typeof regionalGeo.lng === 'number') {
+            userLocation = { lat: regionalGeo.lat, lng: regionalGeo.lng };
+            formattedName = `${regionalGeo.formatted_address || location} (${Number(regionalGeo.lat).toFixed(6)}, ${Number(regionalGeo.lng).toFixed(6)})`;
+            console.log(`✅ Regional geocode succeeded: ${formattedName}`);
+          }
+        } catch (e) {
+          // ignore - we'll try other methods
+        }
+
+        // 2) If regional geocode didn't return a usable result, fallback to non-regional geocode/Nominatim
+        // (Previously we used Google Places here; removed to simplify geocoding flow.)
+        // No-op: will try final fallback below using geocodeLocation()
+
+        // 3) Final fallback: if still not found, try a non-regional geocode or Nominatim via geocodeLocation
+        if (!userLocation) {
+          try {
+            const geocodedLocation = await geocodeLocation(location);
+            userLocation = { lat: geocodedLocation.lat, lng: geocodedLocation.lng };
+            formattedName = `${geocodedLocation.formatted_address} (${Number(geocodedLocation.lat).toFixed(6)}, ${Number(geocodedLocation.lng).toFixed(6)})`;
+            console.log(`✅ Fallback geocoded to: ${userLocation.lat},${userLocation.lng}`);
+            console.log(`   Address: ${geocodedLocation.formatted_address}`);
+          } catch (error) {
+            return res.status(400).json({
+              success: false,
+              message: `Could not find location "${location}". Please provide coordinates as "lat,lng" or a valid location name.`
+            });
+          }
         }
       }
     } else if (typeof location === 'object' && location.lat && location.lng) {
-      userLocation = location;
+      userLocation = { lat: Number(location.lat), lng: Number(location.lng) };
+      // derive a friendly name from coordinates when possible
+      try {
+        const geo = await geocodeLatLng(userLocation.lat, userLocation.lng);
+        if (geo && geo.formatted_address) {
+          formattedName = `${geo.formatted_address} (${Number(geo.lat).toFixed(6)}, ${Number(geo.lng).toFixed(6)})`;
+          userLocation = { lat: Number(geo.lat), lng: Number(geo.lng) };
+        }
+      } catch (e) { /* ignore */ }
     } else {
       return res.status(400).json({
         success: false,
@@ -1322,8 +1802,17 @@ app.post('/api/check-availability', async (req, res) => {
       });
     }
 
+    // If we couldn't derive a friendly formattedName, fall back to raw coords or original string
+    if (!formattedName) {
+      if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lng === 'number') {
+        formattedName = `${Number(userLocation.lat).toFixed(6)}, ${Number(userLocation.lng).toFixed(6)}`;
+      } else if (typeof location === 'string') {
+        formattedName = location;
+      }
+    }
+
               // STEP 3: Find nearby buses (checks if routes intersect 1.5km circle)
-      const nearbyBuses = await findNearbyBusesDb(userLocation, 1.5);
+              const nearbyBuses = await findNearbyBusesDb(userLocation, 1.5);
 
     // Log the availability check to database and include optional requester flag.
     // This is made resilient: if Prisma create fails due to schema mismatch,
@@ -1331,8 +1820,8 @@ app.post('/api/check-availability', async (req, res) => {
     // are still recorded even before the DB migration is applied.
     try {
       const requestBusFlag = req.body && (req.body.requestBus === true || String(req.body.requestBus).toLowerCase() === 'yes');
-      const rawLoc = typeof location === 'string' ? location : `${userLocation.lat},${userLocation.lng}`;
-      const locationToSave = requestBusFlag ? `__REQ__YES__||${rawLoc}` : rawLoc;
+      // Use the human-friendly formattedName derived earlier (e.g. "Place Name (lat, lng)")
+      const locationToSave = requestBusFlag ? `__REQ__YES__||${formattedName}` : formattedName;
 
       // First try the Prisma create using the newer schema (contact + requested)
       try {
@@ -1407,6 +1896,82 @@ app.post('/api/check-availability', async (req, res) => {
       success: false,
       message: 'Internal server error'
     });
+  }
+});
+
+// Debug: return cached/generated full route polyline points for a bus (unprotected)
+// Useful during development to inspect the actual path used for intersection checks.
+app.get('/api/debug/route-path/:busNumber', async (req, res) => {
+  try {
+    const busNumber = req.params.busNumber;
+    if (!busNumber) return res.status(400).json({ success: false, message: 'busNumber required' });
+    const bus = await prisma.bus.findUnique({ where: { number: busNumber }, include: { stops: true } });
+    if (!bus) return res.status(404).json({ success: false, message: 'Bus not found' });
+    const cached = routePolylinesCache.get(bus.id);
+    if (cached && ((cached.morningRoute && cached.morningRoute.length) || (cached.eveningRoute && cached.eveningRoute.length))) {
+      return res.json({ success: true, bus: { number: bus.number, id: bus.id }, cache: cached });
+    }
+
+    // Try to build on-demand (non-blocking) and return
+    try {
+      const built = await buildRouteForBus(bus);
+      // Do not persist here to avoid triggering file-watcher loops; store in-memory
+      routePolylinesCache.set(bus.id, built);
+      return res.json({ success: true, bus: { number: bus.number, id: bus.id }, cache: built });
+    } catch (e) {
+      return res.status(500).json({ success: false, message: 'Failed to build route', error: e && e.message });
+    }
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Admin-only: trigger a debounced route cache rebuild immediately
+app.post('/api/admin/rebuild-routes', requireAdmin, requireCsrf, async (req, res) => {
+  try {
+    scheduleRouteCacheRebuild(true); // immediate (subject to scheduler guards)
+    return res.json({ success: true, message: 'Route rebuild scheduled' });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Failed to schedule rebuild', error: e && e.message });
+  }
+});
+
+// Admin-only utility: compute minDist (point-only) and segment min-distance for a given bus and user coords
+app.post('/api/admin/debug/min-dist', requireAdmin, async (req, res) => {
+  try {
+    const { busNumber, lat, lng } = req.body || {};
+    if (!busNumber || typeof lat === 'undefined' || typeof lng === 'undefined') return res.status(400).json({ success: false, message: 'busNumber, lat, lng required' });
+    const bus = await prisma.bus.findUnique({ where: { number: String(busNumber) }, include: { stops: true } });
+    if (!bus) return res.status(404).json({ success: false, message: 'Bus not found' });
+
+    // Use cached polyline if available, else build on-demand (do not persist to disk here)
+    let cached = routePolylinesCache.get(bus.id);
+    if (!cached) {
+      try { cached = await buildRouteForBus(bus); routePolylinesCache.set(bus.id, cached); } catch (e) { /* ignore build failure */ }
+    }
+
+    const userLocation = { lat: Number(lat), lng: Number(lng) };
+    const report = { busNumber: bus.number, busId: bus.id, userLocation };
+
+    // Compute point-only min dist for morning/evening
+    const computeFor = (route) => {
+      if (!route || route.length === 0) return { minDistPoint: Infinity, minIndexPoint: -1, minDistSegment: Infinity, minSegmentIndex: -1 };
+      const { minDist, minIndex } = getMinDistanceAlongPath(userLocation, route);
+      let minSeg = Infinity; let minSegIndex = -1;
+      for (let i = 0; i < route.length - 1; i++) {
+        const a = route[i]; const b = route[i+1];
+        const segDist = pointToSegmentDistanceMeters(a, b, { lat: userLocation.lat, lng: userLocation.lng });
+        if (segDist < minSeg) { minSeg = segDist; minSegIndex = i; }
+      }
+      return { minDistPoint: minDist, minIndexPoint: minIndex, minDistSegment: minSeg, minSegmentIndex: minSegIndex };
+    };
+
+    report.morning = cached && cached.morningRoute ? computeFor(cached.morningRoute) : null;
+    report.evening = cached && cached.eveningRoute ? computeFor(cached.eveningRoute) : null;
+
+    return res.json({ success: true, report });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Internal error', error: e && e.message });
   }
 });
 
@@ -1502,6 +2067,8 @@ httpServer.listen(PORT, () => {
 });
 
 module.exports = app;
+// Export selected helpers for external maintenance scripts (non-breaking)
+module.exports.geocodeLatLng = geocodeLatLng;
 
 // Global error handler: return JSON for errors (helps client-side uploads and API consumers)
 app.use((err, req, res, next) => {

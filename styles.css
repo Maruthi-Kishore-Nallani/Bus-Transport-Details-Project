@@ -104,6 +104,25 @@ main {
   font-size: 0.95rem;
 }
 
+/* Fees Structure Download Button */
+.fees-section { position: relative; }
+.fees-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 28px;
+  border-radius: 10px;
+  background: linear-gradient(90deg,#00c6ff,#0072ff);
+  color:#fff;
+  font-weight:600;
+  font-size:1rem;
+  text-decoration:none;
+  box-shadow:0 4px 14px rgba(0,0,0,0.12);
+  transition: transform .2s, box-shadow .2s;
+}
+.fees-download-btn:hover { transform: translateY(-3px); box-shadow:0 6px 18px rgba(0,0,0,0.18); }
+.fees-download-wrapper { text-align:center; margin-top:12px; }
+
 /* Input Fields */
 label {
   display: block;
