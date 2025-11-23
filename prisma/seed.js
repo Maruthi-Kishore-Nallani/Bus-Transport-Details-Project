@@ -7,12 +7,35 @@ async function main() {
   const pass  = process.env.MAIN_ADMIN_PASSWORD ;
   const hash  = bcrypt.hashSync(pass, 10);
 
-  await prisma.admin.upsert({
-    where: { email },
-    update: {},
-    create: { email, password: hash }
-  });
+  // Check if Admin table has 'approved' column
+  let hasApprovedColumn = false;
+  try {
+    const result = await prisma.$queryRaw`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'Admin' AND column_name = 'approved'
+    `;
+    hasApprovedColumn = result && result.length > 0;
+  } catch (e) {
+    console.log('Could not check for approved column, assuming it does not exist');
+  }
+
+  // Upsert admin with or without approved field
+  if (hasApprovedColumn) {
+    await prisma.admin.upsert({
+      where: { email },
+      update: { approved: true },
+      create: { email, password: hash, approved: true }
+    });
+  } else {
+    await prisma.admin.upsert({
+      where: { email },
+      update: {},
+      create: { email, password: hash }
+    });
+  }
   
+  console.log('✓ Admin user created/updated');
 
   // Define all buses with their routes
   const busData = [
@@ -319,9 +342,11 @@ async function main() {
         }
       });
     }
+    
+    console.log(`✓ Seeded bus ${busInfo.number} (${busInfo.name}) with ${busInfo.morningStops.length} morning + ${busInfo.eveningStops.length} evening stops`);
   }
 
-  console.log('✅ Seeded buses with complete routes');
+  console.log('✅ Database seeded successfully with 5 buses!');
 }
 
 main().then(()=>prisma.$disconnect()).catch(e=>{console.error(e);process.exit(1);});
