@@ -403,6 +403,40 @@ async function geocodeLocation(locationName) {
   });
 }
 
+// Server-side geocoding endpoint (POST) - resolves place name to coords
+app.post('/api/geocode', async (req, res) => {
+  try {
+    const location = req.body && req.body.location;
+    if (!location || typeof location !== 'string') return res.status(400).json({ success: false, message: 'location string required' });
+    try {
+      const geo = await geocodeLocation(location);
+      return res.json({ success: true, location: geo });
+    } catch (e) {
+      return res.status(400).json({ success: false, message: e && e.message ? e.message : 'Geocoding failed' });
+    }
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Server-side reverse geocoding endpoint (POST) - resolves coords to formatted address
+app.post('/api/reverse-geocode', async (req, res) => {
+  try {
+    const lat = Number(req.body && req.body.lat);
+    const lng = Number(req.body && req.body.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return res.status(400).json({ success: false, message: 'lat and lng required' });
+    try {
+      const addr = await reverseGeocode(lat, lng);
+      return res.json({ success: true, address: addr });
+    } catch (e) {
+      return res.status(400).json({ success: false, message: 'Reverse geocoding failed' });
+    }
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+
 /**
  * Reverse geocode coordinates -> place name (formatted address)
  * Caches results to minimize API calls.

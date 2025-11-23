@@ -143,8 +143,8 @@ Click "Advanced" → Add these environment variables:
 - Select: **HTTP referrers (web sites)**
 - Add these referrers:
   ```
-  https://bus-transport-api.onrender.com/*
-  https://bus-transport-api-*.onrender.com/*
+  https://bus-transport-details.onrender.com/*
+  https://bus-transport-details-*.onrender.com/*
   ```
   (Replace `bus-transport-api` with YOUR service name)
 

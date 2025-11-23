@@ -319,22 +319,20 @@ document.getElementById('useCurrentLocation')?.addEventListener('click', () => {
       const lat = position.coords.latitude; // use full precision
       const lng = position.coords.longitude; // use full precision
       const accuracyMeters = position.coords.accuracy; // estimated radius in meters
-      // Try reverse geocoding to get a readable place name (uses Google Maps JS if available)
+      // Try reverse geocoding via server to get a readable place name
       let displayVal = `${lat},${lng}`;
       try {
-        await loadGoogleMapsApi();
-        const geocoder = new google.maps.Geocoder();
-        const results = await new Promise((resolve, reject) => {
-          geocoder.geocode({ location: { lat, lng } }, (res, status) => {
-            if (status === 'OK' && res && res[0]) return resolve(res);
-            return resolve(null);
-          });
+        const resp = await fetch(`${API_BASE_URL}/api/reverse-geocode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng })
         });
-        if (results && results[0] && results[0].formatted_address) {
-          displayVal = results[0].formatted_address;
+        const j = await resp.json();
+        if (resp.ok && j && j.success && j.address) {
+          displayVal = j.address;
         }
       } catch (e) {
-        // fallback to coords if geocoding fails
+        // fallback to coords if reverse geocoding fails
       }
       input.value = displayVal;
 
