@@ -42,6 +42,10 @@ Open `page.html` (user) and `admin.html` (admin login). New admins can request a
 ## Notes
 - Requires a valid Google Maps API key for geocoding/reverse-geocoding.
 - Data is stored in PostgreSQL (configure via `DATABASE_URL` in `.env`).
+- **Interactive Maps in Production:** The `/api/maps-key` endpoint is disabled in production for security. Route maps in the modal will show a placeholder with stop names. To enable interactive maps in production, add the Maps script directly to your HTML with a properly restricted API key:
+  ```html
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_RESTRICTED_KEY&libraries=places" async defer></script>
+  ```
 
 ## Security Checklist
 

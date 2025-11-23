@@ -1035,8 +1035,14 @@ async function generateRouteMap(routeType, routeData) {
       });
     }
   } catch (err) {
-    // On failure, show placeholder
-    if (placeholder) placeholder.style.display = 'flex';
+    // On failure, show placeholder with helpful message
+    if (placeholder) {
+      placeholder.style.display = 'flex';
+      const placeholderText = placeholder.querySelector('p:not(.map-note)');
+      if (placeholderText && err.message && err.message.includes('Google Maps script not found')) {
+        placeholderText.textContent = 'Route stops listed above. Interactive map unavailable.';
+      }
+    }
     console.error('Map render failed:', err);
   }
 }
