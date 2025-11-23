@@ -4,6 +4,7 @@
   "description": "Backend API for the bus availability checker",
   "main": "server.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
@@ -12,6 +13,7 @@
     "start": "node server.js",
     "start:prod": "NODE_ENV=production node server.js",
     "generate": "prisma generate",
+    "build": "prisma generate && prisma migrate deploy && npm run db:seed",
     "test:env": "node -e \"console.log('Environment check:'); console.log('NODE_ENV:', process.env.NODE_ENV); console.log('JWT Secret set:', !!process.env.ADMIN_JWT_SECRET); console.log('DB URL set:', !!process.env.DATABASE_URL); console.log('Google Maps key set:', !!process.env.GOOGLE_MAPS_API_KEY);\""
   },
   "dependencies": {

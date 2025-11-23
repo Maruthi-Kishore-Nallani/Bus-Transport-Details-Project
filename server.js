@@ -2055,7 +2055,7 @@ app.get('/api/routes', async (req, res) => {
 });
 
 // Start HTTP server (with socket.io attached)
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   logger.info('Bus API Server started', { 
     port: PORT, 
     nodeEnv: process.env.NODE_ENV || 'development',
@@ -2064,6 +2064,22 @@ httpServer.listen(PORT, () => {
       availability: `POST http://localhost:${PORT}/api/check-availability`
     }
   });
+
+  // Auto-migrate JSON data to database on startup
+  try {
+    const { autoMigrate } = require('./autoMigrate');
+    await autoMigrate();
+  } catch (error) {
+    logger.warn('Auto-migration skipped or failed', { error: error.message });
+  }
+
+  // Initialize route cache cleanup (2-hour refresh)
+  try {
+    const { initializeRouteCacheCleanup } = require('./dbHelpers');
+    initializeRouteCacheCleanup();
+  } catch (error) {
+    logger.warn('Route cache cleanup initialization skipped', { error: error.message });
+  }
 });
 
 module.exports = app;

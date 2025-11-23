@@ -11,6 +11,7 @@ model Admin {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
+  approved  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -34,6 +35,7 @@ model Bus {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   stops     Stop[]
+  routeCache RouteCache[]
 }
 
 model Stop {
@@ -47,7 +49,7 @@ model Stop {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bus       Bus      @relation(fields: [busId], references: [id])
+  bus       Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
 
   @@index([busId, period, order])
 }
@@ -61,6 +63,31 @@ model AvailabilityLog {
   requested Boolean  @default(false)
   status    String
   createdAt DateTime @default(now())
+}
+
+model SiteSettings {
+  id               Int      @id @default(autoincrement())
+  siteTitle        String   @default("BUS TRANSPORT DETAILS")
+  organizationName String   @default("")
+  contactAddress   String   @default("")
+  contactPhone     String   @default("")
+  contactEmail     String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model RouteCache {
+  id            Int      @id @default(autoincrement())
+  busId         Int
+  period        Period
+  routeData     Json     // Stores the route coordinates array
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bus           Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
+
+  @@unique([busId, period])
+  @@index([updatedAt])
 }
 
 enum Period {

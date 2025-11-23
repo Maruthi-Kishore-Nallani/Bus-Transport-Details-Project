@@ -267,12 +267,22 @@ async function main() {
   for (const busInfo of busData) {
     const bus = await prisma.bus.upsert({
       where: { number: busInfo.number },
-      update: {},
+      update: {
+        name: busInfo.name,
+        location: busInfo.location,
+        driverName: busInfo.driverName,
+        driverPhone: busInfo.driverPhone,
+        liveLocationUrl: busInfo.liveLocationUrl,
+        capacity: busInfo.capacity
+      },
       create: {
         number: busInfo.number,
         name: busInfo.name,
         location: busInfo.location,
-        capacity: 60,
+        driverName: busInfo.driverName,
+        driverPhone: busInfo.driverPhone,
+        liveLocationUrl: busInfo.liveLocationUrl,
+        capacity: busInfo.capacity,
         currentOccupancy: 0
       }
     });
@@ -311,7 +321,7 @@ async function main() {
     }
   }
 
-  console.log('✅ Seeded 5 buses with complete routes');
+  console.log('✅ Seeded buses with complete routes');
 }
 
 main().then(()=>prisma.$disconnect()).catch(e=>{console.error(e);process.exit(1);});

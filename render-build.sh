@@ -1,5 +1,16 @@
-# Build Command
-npm install && npx prisma generate && npx prisma migrate deploy
+#!/bin/bash
+# Render Build Script
 
-# Start Command  
-npm start
+# Install dependencies
+npm install
+
+# Generate Prisma client
+npx prisma generate
+
+# Apply database migrations
+npx prisma migrate deploy
+
+# Seed the database (safe to run multiple times, uses upsert)
+npm run db:seed
+
+echo "Build completed successfully!"
