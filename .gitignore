@@ -7,6 +7,6 @@ build/
 *.log
 pending_admins.json
 /generated/prisma
-"pending_admins.json" 
-"settings.json" 
-"uploads/" 
+pending_admins.json
+settings.json 
+uploads/
