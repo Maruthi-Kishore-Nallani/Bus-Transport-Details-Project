@@ -1,6 +1,10 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+function hasDelegate(delegate, method = 'findFirst') {
+  return delegate && typeof delegate[method] === 'function';
+}
+
 // ============================================
 // SITE SETTINGS HELPERS
 // ============================================
@@ -16,6 +20,7 @@ const DEFAULT_SETTINGS = {
  */
 async function getSiteSettings() {
   try {
+    if (!hasDelegate(prisma.siteSettings)) throw new Error('Model SiteSettings not available');
     let settings = await prisma.siteSettings.findFirst({
       orderBy: { id: 'asc' }
     });
@@ -53,6 +58,7 @@ async function getSiteSettings() {
  */
 async function updateSiteSettings(updates) {
   try {
+    if (!hasDelegate(prisma.siteSettings)) throw new Error('Model SiteSettings not available');
     const { siteTitle, organizationName, contact } = updates;
 
     let settings = await prisma.siteSettings.findFirst({
@@ -205,6 +211,7 @@ const ROUTE_CACHE_REFRESH_HOURS = 2;
  */
 async function getRouteFromCache(busId, period) {
   try {
+    if (!hasDelegate(prisma.routeCache, 'findUnique')) return null;
     const cached = await prisma.routeCache.findUnique({
       where: {
         busId_period: {
@@ -239,6 +246,7 @@ async function getRouteFromCache(busId, period) {
  */
 async function saveRouteToCache(busId, period, routeData) {
   try {
+    if (!hasDelegate(prisma.routeCache, 'upsert')) return false;
     await prisma.routeCache.upsert({
       where: {
         busId_period: {
@@ -269,6 +277,7 @@ async function saveRouteToCache(busId, period, routeData) {
  */
 async function clearExpiredRouteCache() {
   try {
+    if (!hasDelegate(prisma.routeCache, 'deleteMany')) return 0;
     const expiryTime = new Date(Date.now() - ROUTE_CACHE_REFRESH_HOURS * 60 * 60 * 1000);
     
     const result = await prisma.routeCache.deleteMany({
@@ -294,6 +303,7 @@ async function clearExpiredRouteCache() {
  */
 async function getAllRoutesForBus(busId) {
   try {
+    if (!hasDelegate(prisma.routeCache, 'findMany')) return { morningRoute: null, eveningRoute: null };
     const routes = await prisma.routeCache.findMany({
       where: {
         busId: parseInt(busId)

@@ -274,6 +274,8 @@ app.get('/', (req, res) => {
 // Prepare uploads directory and multer
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Serve uploads explicitly to ensure predictable public paths
+app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0 }));
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
@@ -281,7 +283,8 @@ const storage = multer.diskStorage({
     try {
       const busNumber = req.params && req.params.busNumber ? String(req.params.busNumber) : String(Date.now());
       const ext = path.extname(file.originalname) || '.jpg';
-      const fname = `${busNumber}_image${ext}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const ts = Date.now();
+      const fname = `${busNumber}_image_${ts}${ext}`.replace(/[^a-zA-Z0-9._-]/g, '_');
       cb(null, fname);
     } catch (e) {
       const safeName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
@@ -313,15 +316,18 @@ const pdfUpload = multer({
     cb(null, true);
   }
 });
-// ---- Simple settings storage (JSON file) ----
+// ---- Site settings unified with database (fallback to JSON) ----
+const { getSiteSettings, updateSiteSettings, DEFAULT_SETTINGS } = require('./dbHelpers');
 const SETTINGS_PATH = path.join(__dirname, 'settings.json');
-const DEFAULT_SETTINGS = {
-  siteTitle: 'BUS TRANSPORT DETAILS',
-  organizationName: 'Your Institution',
-  contact: { address: 'Address line', phone: '+91 00000 00000', email: 'support@example.com' }
-};
 
-function readSettingsFile() {
+async function loadUnifiedSettings() {
+  // Prefer DB-backed settings; fall back to local JSON file if DB unavailable
+  try {
+    const s = await getSiteSettings();
+    if (s && typeof s === 'object') return s;
+  } catch (e) {
+    logger.warn('DB settings read failed, falling back to file', { error: e && e.message });
+  }
   try {
     if (fs.existsSync(SETTINGS_PATH)) {
       const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
@@ -329,51 +335,41 @@ function readSettingsFile() {
       return { ...DEFAULT_SETTINGS, ...parsed, contact: { ...DEFAULT_SETTINGS.contact, ...(parsed.contact || {}) } };
     }
   } catch (e) {
-    logger.error('Failed to read settings file, using defaults', { error: e.message });
+    logger.error('Failed to read settings file, using defaults', { error: e && e.message });
   }
   return { ...DEFAULT_SETTINGS };
 }
 
-function writeSettingsFile(settings) {
-  try {
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
-    return true;
-  } catch (e) {
-    logger.error('Failed to write settings file', { error: e.message });
-    return false;
-  }
-}
-
-let siteSettings = readSettingsFile();
+let siteSettings = DEFAULT_SETTINGS;
+// Load settings on startup (async)
+(async () => { try { siteSettings = await loadUnifiedSettings(); } catch (e) {} })();
 
 // Public settings
-app.get('/api/settings', (req, res) => {
+app.get('/api/settings', async (req, res) => {
   // DO NOT expose the actual Google Maps API key to clients for security
   // Instead, return a boolean indicating if Maps functionality is available
-  const settingsPublic = { 
-    ...siteSettings, 
-    mapsEnabled: Boolean(process.env.GOOGLE_MAPS_API_KEY)
-  };
+  try {
+    siteSettings = await loadUnifiedSettings();
+  } catch (e) { /* keep last known */ }
+  const settingsPublic = { ...siteSettings, mapsEnabled: Boolean(process.env.GOOGLE_MAPS_API_KEY) };
   res.json({ success: true, settings: settingsPublic });
 });
 
 // Protected update settings
-app.put('/api/admin/settings', requireAdmin, (req, res) => {
-  const { siteTitle, organizationName, contact } = req.body || {};
-  const next = {
-    siteTitle: (siteTitle ?? siteSettings.siteTitle ?? DEFAULT_SETTINGS.siteTitle).toString(),
-    organizationName: (organizationName ?? siteSettings.organizationName ?? DEFAULT_SETTINGS.organizationName).toString(),
-    contact: {
-      address: (contact?.address ?? siteSettings.contact.address ?? DEFAULT_SETTINGS.contact.address).toString(),
-      phone: (contact?.phone ?? siteSettings.contact.phone ?? DEFAULT_SETTINGS.contact.phone).toString(),
-      email: (contact?.email ?? siteSettings.contact.email ?? DEFAULT_SETTINGS.contact.email).toString()
-    }
-  };
-  siteSettings = next;
-  if (!writeSettingsFile(siteSettings)) {
+app.put('/api/admin/settings', requireAdmin, async (req, res) => {
+  try {
+    const { siteTitle, organizationName, contact } = req.body || {};
+    // Persist to DB first (source of truth)
+    const saved = await updateSiteSettings({ siteTitle, organizationName, contact });
+    if (!saved) throw new Error('DB persist failed');
+    siteSettings = saved;
+    // Also write to local file as cache/fallback (best-effort)
+    try { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(siteSettings, null, 2), 'utf-8'); } catch (e) { /* best effort */ }
+    return res.json({ success: true, settings: siteSettings });
+  } catch (e) {
+    logger.error('Failed to update settings', { error: e && e.message });
     return res.status(500).json({ success: false, message: 'Failed to persist settings' });
   }
-  res.json({ success: true, settings: siteSettings });
 });
 
 // --- Enhanced geocode + routing + intersection helpers ---
@@ -1610,7 +1606,11 @@ app.post('/api/admin/buses/:busNumber/photo', requireAdmin, requireCsrf, upload.
     let thumbnailUrl = null;
     try {
       const ext = path.extname(file.filename) || '.jpg';
-      const thumbName = `${busNumber}_thumb${ext}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      // Keep same timestamp suffix as original by replacing the marker
+      let thumbName = file.filename.includes('_image_')
+        ? file.filename.replace('_image_', '_thumb_')
+        : `${busNumber}_thumb_${Date.now()}${ext}`;
+      thumbName = thumbName.replace(/[^a-zA-Z0-9._-]/g, '_');
       const inPath = path.join(UPLOADS_DIR, file.filename);
       const outPath = path.join(UPLOADS_DIR, thumbName);
       await sharp(inPath).resize(320, 200, { fit: 'cover' }).toFile(outPath);

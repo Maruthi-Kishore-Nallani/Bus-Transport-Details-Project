@@ -38,40 +38,56 @@ async function main() {
   console.log('✓ Admin user created/updated');
 
   // Define all buses with their routes
+  
   const busData = [
     {
-      number: '7',
-      name: 'AP39UY7594',
-      location: 'Location_7',
-      driverName: 'K Subramanyam',
-      driverPhone: '6304413347',
-      liveLocationUrl: 'https://tinyurl.com/2hsm5mys',
+      number: '1',
+      name: 'APXXYYZZZZ',
+      location: 'Location_1',
+      driverName: 'XXXX',
+      driverPhone: 'YYYYYYYYYY',
+      liveLocationUrl: '',
+      capacity: 60,
+      morningStops: [],
+      eveningStops: []
+    },
+    {
+      number: '2',
+      name: 'AP39UY7589',
+      location: 'Location_2',
+      driverName: 'B Karthik',
+      driverPhone: '7036619577',
+      liveLocationUrl: 'https://tinyurl.com/yj2xaaw7',
       capacity: 60,
       morningStops: [
-        { name: 'Stop 1', lat: 16.521810, lng: 80.628261 },
-        { name: 'Stop 2', lat: 16.521192, lng: 80.638601 },
-        { name: 'Stop 3', lat: 16.522685, lng: 80.644597 },
-        { name: 'Stop 4', lat: 16.524123, lng: 80.654142 },
-        { name: 'Stop 5', lat: 16.523220, lng: 80.666307 },
-        { name: 'Stop 6', lat: 16.519899, lng: 80.665703 },
-        { name: 'Stop 7', lat: 16.509900, lng: 80.652972 },
-        { name: 'Stop 8', lat: 16.508772, lng: 80.650908 },
-        { name: 'Stop 9', lat: 16.505832, lng: 80.659325 },
-        { name: 'Stop 10', lat: 16.502702, lng: 80.668413 },
-        { name: 'Stop 11', lat: 16.482109, lng: 80.691247 }
+        { name: 'Stop 1', lat: 16.198695, lng: 81.148362 },
+        { name: 'Stop 2', lat: 16.192784, lng: 81.142747 },
+        { name: 'Stop 3', lat: 16.181148, lng: 81.130006 },
+        { name: 'Stop 4', lat: 16.183537, lng: 81.128035 },
+        { name: 'Stop 5', lat: 16.190267, lng: 81.122696 },
+        { name: 'Stop 6', lat: 16.214409, lng: 81.077548 },
+        { name: 'Stop 7', lat: 16.324227, lng: 80.961410 },
+        { name: 'Stop 8', lat: 16.362069, lng: 80.877701 },
+        { name: 'Stop 9', lat: 16.360922, lng: 80.850862 },
+        { name: 'Stop 10', lat: 16.360796, lng: 80.847118 },
+        { name: 'Stop 11', lat: 16.360078, lng: 80.844382 },
+        { name: 'Stop 12', lat: 16.365839, lng: 80.841941 },
+        { name: 'Stop 13', lat: 16.482109, lng: 80.691247 }
       ],
       eveningStops: [
         { name: 'Stop 1', lat: 16.482109, lng: 80.691247 },
-        { name: 'Stop 2', lat: 16.502702, lng: 80.668413 },
-        { name: 'Stop 3', lat: 16.505832, lng: 80.659325 },
-        { name: 'Stop 4', lat: 16.508772, lng: 80.650908 },
-        { name: 'Stop 5', lat: 16.509900, lng: 80.652972 },
-        { name: 'Stop 6', lat: 16.519899, lng: 80.665703 },
-        { name: 'Stop 7', lat: 16.523220, lng: 80.666307 },
-        { name: 'Stop 8', lat: 16.524123, lng: 80.654142 },
-        { name: 'Stop 9', lat: 16.522685, lng: 80.644597 },
-        { name: 'Stop 10', lat: 16.521192, lng: 80.638601 },
-        { name: 'Stop 11', lat: 16.521810, lng: 80.628261 }
+        { name: 'Stop 2', lat: 16.365839, lng: 80.841941 },
+        { name: 'Stop 3', lat: 16.360078, lng: 80.844382 },
+        { name: 'Stop 4', lat: 16.360796, lng: 80.847118 },
+        { name: 'Stop 5', lat: 16.360922, lng: 80.850862 },
+        { name: 'Stop 6', lat: 16.362069, lng: 80.877701 },
+        { name: 'Stop 7', lat: 16.324227, lng: 80.961410 },
+        { name: 'Stop 8', lat: 16.214409, lng: 81.077548 },
+        { name: 'Stop 9', lat: 16.190267, lng: 81.122696 },
+        { name: 'Stop 10', lat: 16.183537, lng: 81.128035 },
+        { name: 'Stop 11', lat: 16.181148, lng: 81.130006 },
+        { name: 'Stop 12', lat: 16.192784, lng: 81.142747 },
+        { name: 'Stop 13', lat: 16.198695, lng: 81.148362 }
       ]
     },
     {
@@ -143,94 +159,7 @@ async function main() {
         { name: 'Stop 26', lat: 16.635359, lng: 80.970527 }
       ]
     },
-    {
-      number: '6',
-      name: 'AP39UY7591',
-      location: 'Location_6',
-      driverName: 'M Nageswar Rao',
-      driverPhone: '9000320526',
-      liveLocationUrl: 'https://tinyurl.com/mbfhexfs',
-      capacity: 60,
-      morningStops: [
-        { name: 'Stop 1', lat: 16.297546, lng: 80.431766 },
-        { name: 'Stop 2', lat: 16.293237, lng: 80.449373 },
-        { name: 'Stop 3', lat: 16.293375, lng: 80.454572 },
-        { name: 'Stop 4', lat: 16.297458, lng: 80.456370 },
-        { name: 'Stop 5', lat: 16.319175, lng: 80.472875 },
-        { name: 'Stop 6', lat: 16.408375, lng: 80.555863 },
-        { name: 'Stop 7', lat: 16.421243, lng: 80.572672 },
-        { name: 'Stop 8', lat: 16.424843, lng: 80.576235 },
-        { name: 'Stop 9', lat: 16.427040, lng: 80.578078 },
-        { name: 'Stop 10', lat: 16.431065, lng: 80.581573 },
-        { name: 'Stop 11', lat: 16.437460, lng: 80.586513 },
-        { name: 'Stop 12', lat: 16.480417, lng: 80.618007 },
-        { name: 'Stop 13', lat: 16.483497, lng: 80.619440 },
-        { name: 'Stop 14', lat: 16.500233, lng: 80.632368 },
-        { name: 'Stop 15', lat: 16.499620, lng: 80.637510 },
-        { name: 'Stop 16', lat: 16.496427, lng: 80.642668 },
-        { name: 'Stop 17', lat: 16.496290, lng: 80.651622 },
-        { name: 'Stop 18', lat: 16.484214, lng: 80.690631 }
-      ],
-      eveningStops: [
-        { name: 'Stop 1', lat: 16.484214, lng: 80.690631 },
-        { name: 'Stop 2', lat: 16.496290, lng: 80.651622 },
-        { name: 'Stop 3', lat: 16.496427, lng: 80.642668 },
-        { name: 'Stop 4', lat: 16.499620, lng: 80.637510 },
-        { name: 'Stop 5', lat: 16.500233, lng: 80.632368 },
-        { name: 'Stop 6', lat: 16.483497, lng: 80.619440 },
-        { name: 'Stop 7', lat: 16.480417, lng: 80.618007 },
-        { name: 'Stop 8', lat: 16.437460, lng: 80.586513 },
-        { name: 'Stop 9', lat: 16.431065, lng: 80.581573 },
-        { name: 'Stop 10', lat: 16.427040, lng: 80.578078 },
-        { name: 'Stop 11', lat: 16.424843, lng: 80.576235 },
-        { name: 'Stop 12', lat: 16.421243, lng: 80.572672 },
-        { name: 'Stop 13', lat: 16.408375, lng: 80.555863 },
-        { name: 'Stop 14', lat: 16.319175, lng: 80.472875 },
-        { name: 'Stop 15', lat: 16.297458, lng: 80.456370 },
-        { name: 'Stop 16', lat: 16.293375, lng: 80.454572 },
-        { name: 'Stop 17', lat: 16.293237, lng: 80.449373 },
-        { name: 'Stop 18', lat: 16.297546, lng: 80.431766 }
-      ]
-    },
-    {
-      number: '2',
-      name: 'AP39UY7589',
-      location: 'Location_2',
-      driverName: 'B Karthik',
-      driverPhone: '7036619577',
-      liveLocationUrl: 'https://tinyurl.com/yj2xaaw7',
-      capacity: 60,
-      morningStops: [
-        { name: 'Stop 1', lat: 16.198695, lng: 81.148362 },
-        { name: 'Stop 2', lat: 16.192784, lng: 81.142747 },
-        { name: 'Stop 3', lat: 16.181148, lng: 81.130006 },
-        { name: 'Stop 4', lat: 16.183537, lng: 81.128035 },
-        { name: 'Stop 5', lat: 16.190267, lng: 81.122696 },
-        { name: 'Stop 6', lat: 16.214409, lng: 81.077548 },
-        { name: 'Stop 7', lat: 16.324227, lng: 80.961410 },
-        { name: 'Stop 8', lat: 16.362069, lng: 80.877701 },
-        { name: 'Stop 9', lat: 16.360922, lng: 80.850862 },
-        { name: 'Stop 10', lat: 16.360796, lng: 80.847118 },
-        { name: 'Stop 11', lat: 16.360078, lng: 80.844382 },
-        { name: 'Stop 12', lat: 16.365839, lng: 80.841941 },
-        { name: 'Stop 13', lat: 16.482109, lng: 80.691247 }
-      ],
-      eveningStops: [
-        { name: 'Stop 1', lat: 16.482109, lng: 80.691247 },
-        { name: 'Stop 2', lat: 16.365839, lng: 80.841941 },
-        { name: 'Stop 3', lat: 16.360078, lng: 80.844382 },
-        { name: 'Stop 4', lat: 16.360796, lng: 80.847118 },
-        { name: 'Stop 5', lat: 16.360922, lng: 80.850862 },
-        { name: 'Stop 6', lat: 16.362069, lng: 80.877701 },
-        { name: 'Stop 7', lat: 16.324227, lng: 80.961410 },
-        { name: 'Stop 8', lat: 16.214409, lng: 81.077548 },
-        { name: 'Stop 9', lat: 16.190267, lng: 81.122696 },
-        { name: 'Stop 10', lat: 16.183537, lng: 81.128035 },
-        { name: 'Stop 11', lat: 16.181148, lng: 81.130006 },
-        { name: 'Stop 12', lat: 16.192784, lng: 81.142747 },
-        { name: 'Stop 13', lat: 16.198695, lng: 81.148362 }
-      ]
-    },
+    
     {
       number: '4',
       name: 'AP39UY7592',
@@ -282,6 +211,101 @@ async function main() {
         { name: 'Stop 14', lat: 16.547663, lng: 80.651151 },
         { name: 'Stop 15', lat: 16.548047, lng: 80.652865 },
         { name: 'Stop 16', lat: 16.576917, lng: 80.684021 }
+      ]
+    },
+    {
+      number: '5',
+      name: 'APXXYYZZZZ',
+      location: 'Location_5',
+      driverName: 'XXXX',
+      driverPhone: 'YYYYYYYYYY',
+      liveLocationUrl: '',
+      capacity: 60,
+      morningStops: [],
+      eveningStops: []
+    },
+    {
+      number: '6',
+      name: 'AP39UY7591',
+      location: 'Location_6',
+      driverName: 'M Nageswar Rao',
+      driverPhone: '9000320526',
+      liveLocationUrl: 'https://tinyurl.com/mbfhexfs',
+      capacity: 60,
+      morningStops: [
+        { name: 'Stop 1', lat: 16.297546, lng: 80.431766 },
+        { name: 'Stop 2', lat: 16.293237, lng: 80.449373 },
+        { name: 'Stop 3', lat: 16.293375, lng: 80.454572 },
+        { name: 'Stop 4', lat: 16.297458, lng: 80.456370 },
+        { name: 'Stop 5', lat: 16.319175, lng: 80.472875 },
+        { name: 'Stop 6', lat: 16.408375, lng: 80.555863 },
+        { name: 'Stop 7', lat: 16.421243, lng: 80.572672 },
+        { name: 'Stop 8', lat: 16.424843, lng: 80.576235 },
+        { name: 'Stop 9', lat: 16.427040, lng: 80.578078 },
+        { name: 'Stop 10', lat: 16.431065, lng: 80.581573 },
+        { name: 'Stop 11', lat: 16.437460, lng: 80.586513 },
+        { name: 'Stop 12', lat: 16.480417, lng: 80.618007 },
+        { name: 'Stop 13', lat: 16.483497, lng: 80.619440 },
+        { name: 'Stop 14', lat: 16.500233, lng: 80.632368 },
+        { name: 'Stop 15', lat: 16.499620, lng: 80.637510 },
+        { name: 'Stop 16', lat: 16.496427, lng: 80.642668 },
+        { name: 'Stop 17', lat: 16.496290, lng: 80.651622 },
+        { name: 'Stop 18', lat: 16.484214, lng: 80.690631 }
+      ],
+      eveningStops: [
+        { name: 'Stop 1', lat: 16.484214, lng: 80.690631 },
+        { name: 'Stop 2', lat: 16.496290, lng: 80.651622 },
+        { name: 'Stop 3', lat: 16.496427, lng: 80.642668 },
+        { name: 'Stop 4', lat: 16.499620, lng: 80.637510 },
+        { name: 'Stop 5', lat: 16.500233, lng: 80.632368 },
+        { name: 'Stop 6', lat: 16.483497, lng: 80.619440 },
+        { name: 'Stop 7', lat: 16.480417, lng: 80.618007 },
+        { name: 'Stop 8', lat: 16.437460, lng: 80.586513 },
+        { name: 'Stop 9', lat: 16.431065, lng: 80.581573 },
+        { name: 'Stop 10', lat: 16.427040, lng: 80.578078 },
+        { name: 'Stop 11', lat: 16.424843, lng: 80.576235 },
+        { name: 'Stop 12', lat: 16.421243, lng: 80.572672 },
+        { name: 'Stop 13', lat: 16.408375, lng: 80.555863 },
+        { name: 'Stop 14', lat: 16.319175, lng: 80.472875 },
+        { name: 'Stop 15', lat: 16.297458, lng: 80.456370 },
+        { name: 'Stop 16', lat: 16.293375, lng: 80.454572 },
+        { name: 'Stop 17', lat: 16.293237, lng: 80.449373 },
+        { name: 'Stop 18', lat: 16.297546, lng: 80.431766 }
+      ]
+    },
+    {
+      number: '7',
+      name: 'AP39UY7594',
+      location: 'Location_7',
+      driverName: 'K Subramanyam',
+      driverPhone: '6304413347',
+      liveLocationUrl: 'https://tinyurl.com/2hsm5mys',
+      capacity: 60,
+      morningStops: [
+        { name: 'Stop 1', lat: 16.521810, lng: 80.628261 },
+        { name: 'Stop 2', lat: 16.521192, lng: 80.638601 },
+        { name: 'Stop 3', lat: 16.522685, lng: 80.644597 },
+        { name: 'Stop 4', lat: 16.524123, lng: 80.654142 },
+        { name: 'Stop 5', lat: 16.523220, lng: 80.666307 },
+        { name: 'Stop 6', lat: 16.519899, lng: 80.665703 },
+        { name: 'Stop 7', lat: 16.509900, lng: 80.652972 },
+        { name: 'Stop 8', lat: 16.508772, lng: 80.650908 },
+        { name: 'Stop 9', lat: 16.505832, lng: 80.659325 },
+        { name: 'Stop 10', lat: 16.502702, lng: 80.668413 },
+        { name: 'Stop 11', lat: 16.482109, lng: 80.691247 }
+      ],
+      eveningStops: [
+        { name: 'Stop 1', lat: 16.482109, lng: 80.691247 },
+        { name: 'Stop 2', lat: 16.502702, lng: 80.668413 },
+        { name: 'Stop 3', lat: 16.505832, lng: 80.659325 },
+        { name: 'Stop 4', lat: 16.508772, lng: 80.650908 },
+        { name: 'Stop 5', lat: 16.509900, lng: 80.652972 },
+        { name: 'Stop 6', lat: 16.519899, lng: 80.665703 },
+        { name: 'Stop 7', lat: 16.523220, lng: 80.666307 },
+        { name: 'Stop 8', lat: 16.524123, lng: 80.654142 },
+        { name: 'Stop 9', lat: 16.522685, lng: 80.644597 },
+        { name: 'Stop 10', lat: 16.521192, lng: 80.638601 },
+        { name: 'Stop 11', lat: 16.521810, lng: 80.628261 }
       ]
     }
   ];
@@ -346,7 +370,7 @@ async function main() {
     console.log(`✓ Seeded bus ${busInfo.number} (${busInfo.name}) with ${busInfo.morningStops.length} morning + ${busInfo.eveningStops.length} evening stops`);
   }
 
-  console.log('✅ Database seeded successfully with 5 buses!');
+  console.log('✅ Database seeded successfully with 7 buses!');
 }
 
 main().then(()=>prisma.$disconnect()).catch(e=>{console.error(e);process.exit(1);});
