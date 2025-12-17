@@ -262,8 +262,42 @@ async function main() {
       driverPhone: '9866492635',
       liveLocationUrl: 'https://tinyurl.com/bdzhkxm',
       capacity: 60,
-      morningStops: [],
-      eveningStops: []
+      morningStops: [
+        { name: 'Stop 1', lat: 16.612966, lng: 80.467483 },
+        { name: 'Stop 2', lat: 16.598359, lng: 80.512386 },
+        { name: 'Stop 3', lat: 16.613190, lng: 80.536925 },
+        { name: 'Stop 4', lat: 16.589421, lng: 80.521572 },
+        { name: 'Stop 5', lat: 16.566168, lng: 80.549905 },
+        { name: 'Stop 6', lat: 16.542265, lng: 80.581003 },
+        { name: 'Stop 7', lat: 16.526553, lng: 80.594017 },
+        { name: 'Stop 8', lat: 16.531242, lng: 80.596680 },
+        { name: 'Stop 9', lat: 16.533685, lng: 80.605512 },
+        { name: 'Stop 10', lat: 16.535990, lng: 80.606642 },
+        { name: 'Stop 11', lat: 16.533942, lng: 80.614020 },
+        { name: 'Stop 12', lat: 16.531337, lng: 80.613152 },
+        { name: 'Stop 13', lat: 16.519811, lng: 80.618309 },
+        { name: 'Stop 14', lat: 16.502155, lng: 80.641570 },
+        { name: 'Stop 15', lat: 16.484658, lng: 80.691106 }
+      ],
+
+      eveningStops: [
+        { name: 'Stop 1', lat: 16.484658, lng: 80.691106 },
+        { name: 'Stop 2', lat: 16.502155, lng: 80.641570 },
+        { name: 'Stop 3', lat: 16.519811, lng: 80.618309 },
+        { name: 'Stop 4', lat: 16.531337, lng: 80.613152 },
+        { name: 'Stop 5', lat: 16.533942, lng: 80.614020 },
+        { name: 'Stop 6', lat: 16.535990, lng: 80.606642 },
+        { name: 'Stop 7', lat: 16.533685, lng: 80.605512 },
+        { name: 'Stop 8', lat: 16.531242, lng: 80.596680 },
+        { name: 'Stop 9', lat: 16.526553, lng: 80.594017 },
+        { name: 'Stop 10', lat: 16.542265, lng: 80.581003 },
+        { name: 'Stop 11', lat: 16.566168, lng: 80.549905 },
+        { name: 'Stop 12', lat: 16.589421, lng: 80.521572 },
+        { name: 'Stop 13', lat: 16.613190, lng: 80.536925 },
+        { name: 'Stop 14', lat: 16.598359, lng: 80.512386 },
+        { name: 'Stop 15', lat: 16.612966, lng: 80.467483 }
+      ]
+
     },
     {
       number: '6',
