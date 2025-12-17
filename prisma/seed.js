@@ -42,19 +42,60 @@ async function main() {
   const busData = [
     {
       number: '1',
-      name: 'APXXYYZZZZ',
-      location: 'Location_1',
-      driverName: 'XXXX',
-      driverPhone: 'YYYYYYYYYY',
+      name: 'AP39WH3325',
+      location: 'Gudivada',
+      driverName: 'Ch. Anjinaulu',
+      driverPhone: '8185915077',
       liveLocationUrl: '',
       capacity: 60,
-      morningStops: [],
-      eveningStops: []
+      morningStops: [
+        { name: 'Stop 1', lat: 16.446940, lng: 80.990767 },
+        { name: 'Stop 2', lat: 16.445372, lng: 80.991330 },
+        { name: 'Stop 3', lat: 16.442413, lng: 80.991972 },
+        { name: 'Stop 4', lat: 16.439982, lng: 80.992280 },
+        { name: 'Stop 5', lat: 16.438240, lng: 80.992437 },
+        { name: 'Stop 6', lat: 16.431515, lng: 80.996017 },
+        { name: 'Stop 7', lat: 16.433967, lng: 80.996123 },
+        { name: 'Stop 8', lat: 16.434335, lng: 80.994545 },
+        { name: 'Stop 9', lat: 16.434080, lng: 80.993028 },
+        { name: 'Stop 10', lat: 16.432105, lng: 80.991832 },
+        { name: 'Stop 11', lat: 16.428520, lng: 80.986777 },
+        { name: 'Stop 12', lat: 16.428988, lng: 80.981400 },
+        { name: 'Stop 13', lat: 16.429282, lng: 80.978937 },
+        { name: 'Stop 14', lat: 16.431522, lng: 80.956658 },
+        { name: 'Stop 15', lat: 16.438428, lng: 80.909272 },
+        { name: 'Stop 16', lat: 16.448000, lng: 80.833057 },
+        { name: 'Stop 17', lat: 16.456197, lng: 80.797095 },
+        { name: 'Stop 18', lat: 16.444438, lng: 80.770108 },
+        { name: 'Stop 19', lat: 16.483115, lng: 80.691723 }
+      ],
+
+      eveningStops: [
+        { name: 'Stop 1', lat: 16.483115, lng: 80.691723 },
+        { name: 'Stop 2', lat: 16.444438, lng: 80.770108 },
+        { name: 'Stop 3', lat: 16.456197, lng: 80.797095 },
+        { name: 'Stop 4', lat: 16.448000, lng: 80.833057 },
+        { name: 'Stop 5', lat: 16.438428, lng: 80.909272 },
+        { name: 'Stop 6', lat: 16.431522, lng: 80.956658 },
+        { name: 'Stop 7', lat: 16.429282, lng: 80.978937 },
+        { name: 'Stop 8', lat: 16.428988, lng: 80.981400 },
+        { name: 'Stop 9', lat: 16.428520, lng: 80.986777 },
+        { name: 'Stop 10', lat: 16.432105, lng: 80.991832 },
+        { name: 'Stop 11', lat: 16.434080, lng: 80.993028 },
+        { name: 'Stop 12', lat: 16.434335, lng: 80.994545 },
+        { name: 'Stop 13', lat: 16.433967, lng: 80.996123 },
+        { name: 'Stop 14', lat: 16.431515, lng: 80.996017 },
+        { name: 'Stop 15', lat: 16.438240, lng: 80.992437 },
+        { name: 'Stop 16', lat: 16.439982, lng: 80.992280 },
+        { name: 'Stop 17', lat: 16.442413, lng: 80.991972 },
+        { name: 'Stop 18', lat: 16.445372, lng: 80.991330 },
+        { name: 'Stop 19', lat: 16.446940, lng: 80.990767 }
+      ]
     },
     {
       number: '2',
       name: 'AP39UY7589',
-      location: 'Location_2',
+      location: 'Machilipatnam',
       driverName: 'B Karthik',
       driverPhone: '7036619577',
       liveLocationUrl: 'https://tinyurl.com/yj2xaaw7',
@@ -93,7 +134,7 @@ async function main() {
     {
       number: '3',
       name: 'AP39UY7593',
-      location: 'Location_3',
+      location: 'Hanuman Junction',
       driverName: 'G Venkata Ramana',
       driverPhone: '9951888155',
       liveLocationUrl: 'https://tinyurl.com/547z553f',
@@ -163,7 +204,7 @@ async function main() {
     {
       number: '4',
       name: 'AP39UY7592',
-      location: 'Location_4',
+      location: 'Nunna',
       driverName: 'D Sydhulu',
       driverPhone: '9618221130',
       liveLocationUrl: 'https://tinyurl.com/4z5by6ca',
@@ -215,11 +256,11 @@ async function main() {
     },
     {
       number: '5',
-      name: 'APXXYYZZZZ',
-      location: 'Location_5',
-      driverName: 'XXXX',
-      driverPhone: 'YYYYYYYYYY',
-      liveLocationUrl: '',
+      name: 'AP39UY7590',
+      location: 'Kanchikacherla',
+      driverName: 'O nagula mera',
+      driverPhone: '9866492635',
+      liveLocationUrl: 'https://tinyurl.com/bdzhkxm',
       capacity: 60,
       morningStops: [],
       eveningStops: []
@@ -227,7 +268,7 @@ async function main() {
     {
       number: '6',
       name: 'AP39UY7591',
-      location: 'Location_6',
+      location: 'Guntur',
       driverName: 'M Nageswar Rao',
       driverPhone: '9000320526',
       liveLocationUrl: 'https://tinyurl.com/mbfhexfs',
@@ -276,7 +317,7 @@ async function main() {
     {
       number: '7',
       name: 'AP39UY7594',
-      location: 'Location_7',
+      location: 'BRTS road',
       driverName: 'K Subramanyam',
       driverPhone: '6304413347',
       liveLocationUrl: 'https://tinyurl.com/2hsm5mys',
@@ -370,7 +411,7 @@ async function main() {
     console.log(`✓ Seeded bus ${busInfo.number} (${busInfo.name}) with ${busInfo.morningStops.length} morning + ${busInfo.eveningStops.length} evening stops`);
   }
 
-  console.log('✅ Database seeded successfully with 7 buses!');
+  console.log('✅ Database seeded successfully with buses!');
 }
 
 main().then(()=>prisma.$disconnect()).catch(e=>{console.error(e);process.exit(1);});
